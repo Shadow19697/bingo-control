@@ -1,5 +1,7 @@
-export const DEFAULT_BINGO_MIN = 0;
-export const DEFAULT_BINGO_MAX = 90;
+import { BINGO_MAX, BINGO_MIN } from './config';
+
+export const DEFAULT_BINGO_MIN = BINGO_MIN;
+export const DEFAULT_BINGO_MAX = BINGO_MAX;
 
 export function getBingoNumbers(
   minNumber: number = DEFAULT_BINGO_MIN,

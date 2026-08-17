@@ -27,7 +27,12 @@ Ejemplos:
 
 ## Estructura
 
-- `src/main.ts`: inicializa UI y eventos
-- `src/bingo.ts`: logica de dominio de bingo
-- `src/style.css`: estilos de la interfaz
+- `src/main.ts`: orquestacion principal y binding de eventos
+- `src/config.ts`: constantes y validaciones compartidas
+- `src/bingo.ts`: logica de dominio del bingo (rango, toggle, limpieza)
+- `src/ui/template.ts`: plantilla HTML base de la interfaz
+- `src/ui/grid.ts`: renderizado de la grilla y utilidades de estado visual
+- `src/ui/status.ts`: render del resumen (marcados, faltantes, salida)
+- `src/ui/dom.ts`: utilidades de seleccion segura del DOM
+- `src/style.css`: estilos globales y responsive
 - `docs/`: documentacion funcional y tecnica
