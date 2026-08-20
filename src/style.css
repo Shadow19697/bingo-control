@@ -31,6 +31,41 @@ body {
 	gap: 0.6rem;
 }
 
+.panel {
+	display: grid;
+	gap: 0.6rem;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.tabs {
+	display: inline-flex;
+	gap: 0.2rem;
+	background: #ece6d8;
+	border: 1px solid #d8c9ab;
+	border-radius: 999px;
+	padding: 0.2rem;
+	width: fit-content;
+}
+
+.tab-btn {
+	border: none;
+	background: transparent;
+	color: #5d5a53;
+	padding: 0.46rem 0.84rem;
+	border-radius: 999px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.tab-btn.is-active {
+	background: #ffffff;
+	color: #17363a;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
 .hero {
 	position: relative;
 	background: linear-gradient(110deg, var(--brand), var(--brand-2));
@@ -241,6 +276,82 @@ body {
 	border-color: #c78300;
 }
 
+.tickets-wrap {
+	background: var(--bg-soft);
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	box-shadow: var(--shadow);
+	padding: 0.4rem;
+	overflow: auto;
+	max-height: 62svh;
+}
+
+.tickets-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.83rem;
+	min-width: 1060px;
+}
+
+.tickets-table th,
+.tickets-table td {
+	border: 1px solid #d9ccb2;
+	padding: 0.34rem 0.38rem;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.tickets-table th {
+	background: #ece6d7;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.ticket-id-cell {
+	text-align: left;
+	position: sticky;
+	left: 0;
+	background: #fff8ea;
+	z-index: 1;
+}
+
+.ticket-id-wrap {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.ticket-hit-count {
+	font-size: 0.72rem;
+	padding: 0.1rem 0.38rem;
+	border-radius: 999px;
+	background: #eceff5;
+	color: #25436a;
+}
+
+.ticket-name-cell {
+	text-align: left;
+	min-width: 160px;
+	color: #5f5b50;
+	font-weight: 600;
+}
+
+.ticket-number-cell.called {
+	background: #fcd37f;
+	color: #3b2906;
+	font-weight: 700;
+}
+
+.ticket-complete {
+	background: #daffe8;
+}
+
+.ticket-complete .ticket-id-cell {
+	background: #caf7de;
+}
+
 @keyframes rise {
 	from {
 		transform: translateY(8px);
@@ -302,6 +413,16 @@ body {
 	.grid-wrap {
 		padding: 0.28rem;
 		border-radius: 12px;
+	}
+
+	.tabs {
+		width: 100%;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.tab-btn {
+		padding: 0.44rem 0.56rem;
 	}
 
 	.grid {
