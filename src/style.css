@@ -8,6 +8,8 @@
 	--danger: #bb3e03;
 	--line: #d7c9ac;
 	--shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+	--help-tooltip-font-size: 0.82rem;
+	--ticket-tooltip-font-size: 0.76rem;
 }
 
 * {
@@ -23,17 +25,61 @@ body {
 	background: radial-gradient(circle at 20% 10%, #fff1cf 0%, transparent 45%), radial-gradient(circle at 90% 80%, #cdebf3 0%, transparent 40%), var(--bg);
 }
 
+#app.is-tickets-view {
+	height: 100svh;
+	overflow: hidden;
+}
+
+#app.is-tickets-view .layout {
+	height: 100svh;
+	min-height: 0;
+	padding-bottom: 0.5rem;
+}
+
 .layout {
 	width: min(1100px, calc(100vw - 1rem));
 	margin: 0 auto;
 	padding: clamp(0.35rem, 1.6vh, 0.85rem) 0 clamp(0.45rem, 2vh, 1rem);
 	display: grid;
+	grid-template-rows: auto auto 1fr;
+	min-height: 100svh;
 	gap: 0.6rem;
 }
 
 .panel {
 	display: grid;
 	gap: 0.6rem;
+	min-height: 0;
+}
+
+#panel-tickets {
+	grid-template-rows: auto 1fr;
+	min-height: 0;
+	overflow: hidden;
+}
+
+#panel-control {
+	grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.control-grid-section {
+	min-height: 0;
+}
+
+#panel-control .summary {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr);
+	min-height: 0;
+}
+
+#panel-control .called-list {
+	min-height: 0;
+	max-height: 100%;
+	overflow: auto;
+}
+
+#app.is-tickets-view #panel-tickets {
+	height: 100%;
 }
 
 [hidden] {
@@ -42,6 +88,8 @@ body {
 
 .tabs {
 	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	gap: 0.2rem;
 	background: #ece6d8;
 	border: 1px solid #d8c9ab;
@@ -58,12 +106,59 @@ body {
 	border-radius: 999px;
 	font-weight: 700;
 	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	line-height: 1.1;
+	min-height: 2.1rem;
+	gap: 0.4rem;
+}
+
+.tab-btn > * {
+	flex-shrink: 0;
 }
 
 .tab-btn.is-active {
 	background: #ffffff;
 	color: #17363a;
 	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.tab-btn.has-alert {
+	color: #7b1e09;
+	background: #fff1ea;
+}
+
+.tab-alert-dot {
+	width: 0.78rem;
+	height: 0.78rem;
+	border-radius: 999px;
+	background: #e63900;
+	box-shadow: 0 0 0 0 rgba(230, 57, 0, 0.35);
+	animation: tab-alert-pulse 1.15s infinite;
+}
+
+.tab-alert-label {
+	font-size: 0.78rem;
+	line-height: 1;
+	padding: 0.2rem 0.4rem;
+	border-radius: 999px;
+	background: #e63900;
+	color: white;
+	font-weight: 800;
+}
+
+@keyframes tab-alert-pulse {
+	0% {
+		box-shadow: 0 0 0 0 rgba(230, 57, 0, 0.35);
+	}
+	70% {
+		box-shadow: 0 0 0 10px rgba(230, 57, 0, 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(230, 57, 0, 0);
+	}
 }
 
 .hero {
@@ -108,7 +203,7 @@ body {
 	border: 1px solid #d9cdb9;
 	border-radius: 10px;
 	padding: 0.5rem 0.6rem;
-	font-size: 0.82rem;
+	font-size: var(--help-tooltip-font-size);
 	box-shadow: var(--shadow);
 	opacity: 0;
 	pointer-events: none;
@@ -177,6 +272,55 @@ body {
 	gap: 0.45rem;
 }
 
+.tickets-status-row {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.35rem;
+	overflow-x: auto;
+	padding-bottom: 0.1rem;
+	scrollbar-width: none;
+}
+
+.tickets-status-row::-webkit-scrollbar {
+	display: none;
+}
+
+.tickets-status-row .status-chip {
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.tickets-state-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	cursor: help;
+}
+
+.tickets-state-chip.is-ok {
+	background: #edf9f1;
+	border-color: #b3dfbf;
+	color: #1f8f4e;
+}
+
+.tickets-state-chip.is-error {
+	background: #fff2ea;
+	border-color: #e6b499;
+	color: #9c3412;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 .status-chip {
 	margin: 0;
 	background: #f2efe6;
@@ -190,6 +334,14 @@ body {
 	margin: 0.45rem 0 0;
 	font-size: 0.88rem;
 	overflow-wrap: anywhere;
+}
+
+.called-list.is-ok {
+	color: #1f8f4e;
+	font-size: 1.22rem;
+	font-weight: 800;
+	line-height: 1;
+	margin-top: 0.35rem;
 }
 
 .summary {
@@ -219,7 +371,7 @@ body {
 	border: 1px solid var(--line);
 	background: white;
 	border-radius: 12px;
-	min-height: 46px;
+	min-height: 56px;
 	font-weight: 700;
 	color: var(--ink);
 	cursor: pointer;
@@ -282,21 +434,69 @@ body {
 	border-radius: 14px;
 	box-shadow: var(--shadow);
 	padding: 0.4rem;
+	display: grid;
+	grid-template-rows: auto 1fr;
+	gap: 0.4rem;
+	min-height: 0;
+	height: 100%;
+	overflow: hidden;
+}
+
+.tickets-table-scroll {
+	min-height: 0;
+	height: 100%;
 	overflow: auto;
-	max-height: 62svh;
+	border-radius: 10px;
+}
+
+.tickets-controls {
+	display: inline-flex;
+	gap: 0.3rem;
+	align-items: center;
+	padding-bottom: 0.2rem;
+}
+
+.sort-btn {
+	border: 1px solid #ccbba0;
+	background: #f3ecde;
+	color: #574e3d;
+	padding: 0.44rem 0.68rem;
+	border-radius: 10px;
+	font-weight: 700;
+	cursor: pointer;
+	min-height: 42px;
+}
+
+.sort-btn.is-active {
+	background: #deefe6;
+	border-color: #8ab5a1;
+	color: #194a3d;
 }
 
 .tickets-table {
 	width: 100%;
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0;
 	font-size: 0.83rem;
-	min-width: 1060px;
+	table-layout: fixed;
+	min-width: 1130px;
+}
+
+.tickets-table th:first-child,
+.ticket-id-cell {
+	width: 196px;
+	min-width: 196px;
+}
+
+.tickets-table th:not(:first-child),
+.ticket-number-cell {
+	width: calc((100% - 196px) / 15);
 }
 
 .tickets-table th,
 .tickets-table td {
 	border: 1px solid #d9ccb2;
-	padding: 0.34rem 0.38rem;
+	padding: 0.58rem 0.38rem;
 	text-align: center;
 	white-space: nowrap;
 }
@@ -305,7 +505,11 @@ body {
 	background: #ece6d7;
 	position: sticky;
 	top: 0;
-	z-index: 1;
+	z-index: 20;
+}
+
+.tickets-table th:first-child {
+	z-index: 30;
 }
 
 .ticket-id-cell {
@@ -313,10 +517,20 @@ body {
 	position: sticky;
 	left: 0;
 	background: #fff8ea;
-	z-index: 1;
+	z-index: 9;
 }
 
-.ticket-id-wrap {
+.ticket-id-cell.tooltip-open {
+	z-index: 70;
+}
+
+.ticket-id-value {
+	line-height: 1.1;
+}
+
+.ticket-id-wrap,
+.ticket-id-meta,
+.ticket-id-row {
 	display: flex;
 	justify-content: space-between;
 	gap: 0.5rem;
@@ -324,18 +538,89 @@ body {
 }
 
 .ticket-hit-count {
-	font-size: 0.72rem;
-	padding: 0.1rem 0.38rem;
+	font-size: 0.82rem;
+	padding: 0.16rem 0.42rem;
 	border-radius: 999px;
 	background: #eceff5;
 	color: #25436a;
 }
 
-.ticket-name-cell {
-	text-align: left;
-	min-width: 160px;
-	color: #5f5b50;
-	font-weight: 600;
+.ticket-name-details {
+	position: relative;
+	display: block;
+}
+
+.ticket-name-details[open] {
+	z-index: 75;
+}
+
+.ticket-id-trigger {
+	list-style: none;
+	border: 1px solid #c8bb9f;
+	background: #f6f0e2;
+	border-radius: 10px;
+	min-height: 48px;
+	padding: 0.35rem 0.48rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	font-weight: 700;
+	font-size: 0.9rem;
+	color: #3d382f;
+	cursor: pointer;
+}
+
+.ticket-id-trigger::-webkit-details-marker {
+	display: none;
+}
+
+.ticket-name-tooltip {
+	position: absolute;
+	left: 0.35rem;
+	top: calc(100% + 0.28rem);
+	width: fit-content;
+	max-width: min(320px, calc(100vw - 2.25rem));
+	padding: 0.72rem 0.8rem;
+	border-radius: 10px;
+	border: 1px solid #d5c8b0;
+	background: #fffdf7;
+	color: #273142;
+	font-size: var(--ticket-tooltip-font-size);
+	line-height: 1.32;
+	box-shadow: var(--shadow);
+	z-index: 80;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.ticket-name-details.is-portal-open .ticket-name-tooltip {
+	display: none;
+}
+
+.ticket-tooltip-portal {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: fit-content;
+	max-width: min(320px, calc(100vw - 2.25rem));
+	padding: 0.72rem 0.8rem;
+	border-radius: 10px;
+	border: 1px solid #d5c8b0;
+	background: #fffdf7;
+	color: #273142;
+	font-size: var(--ticket-tooltip-font-size);
+	line-height: 1.32;
+	box-shadow: var(--shadow);
+	white-space: normal;
+	overflow-wrap: anywhere;
+	pointer-events: none;
+	z-index: 200;
+}
+
+.ticket-name-details.is-tooltip-up .ticket-name-tooltip {
+	top: auto;
+	bottom: calc(100% + 0.28rem);
 }
 
 .ticket-number-cell.called {
@@ -364,10 +649,18 @@ body {
 }
 
 @media (max-width: 640px) {
+	html {
+		font-size: 140%;
+	}
+
 	.layout {
 		width: min(100vw - 0.45rem, 920px);
 		padding: 0.25rem 0 0.5rem;
 		gap: 0.45rem;
+	}
+
+	#app.is-tickets-view .layout {
+		padding-bottom: 0.5rem;
 	}
 
 	.hero {
@@ -401,6 +694,10 @@ body {
 		font-size: 0.8rem;
 	}
 
+	.tickets-status-row {
+		gap: 0.25rem;
+	}
+
 	.called-list {
 		font-size: 0.78rem;
 	}
@@ -422,7 +719,7 @@ body {
 	}
 
 	.tab-btn {
-		padding: 0.44rem 0.56rem;
+		padding: 0.54rem 0.62rem;
 	}
 
 	.grid {
@@ -432,20 +729,102 @@ body {
 	.ball,
 	.axis,
 	.empty {
-		min-height: clamp(24px, 6.8vw, 30px);
+		min-height: clamp(34px, 8.2vw, 40px);
 		border-radius: 6px;
-		font-size: clamp(0.54rem, 1.8vw, 0.72rem);
+		font-size: clamp(0.62rem, 2.1vw, 0.82rem);
 		padding: 0;
+	}
+
+	.tickets-table th,
+	.tickets-table td {
+		padding: 0.66rem 0.4rem;
+	}
+
+	.tickets-table {
+		min-width: 1010px;
+	}
+
+	.tickets-table th:first-child,
+	.ticket-id-cell {
+		width: 176px;
+		min-width: 176px;
+	}
+
+	.tickets-table th:not(:first-child),
+	.ticket-number-cell {
+		width: calc((100% - 176px) / 15);
+	}
+
+	.ticket-id-trigger {
+		min-height: 56px;
+		padding: 0.45rem 0.55rem;
+	}
+
+	.ticket-name-tooltip {
+		padding: 0.75rem 0.85rem;
+	}
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+	#app.is-tickets-view .layout {
+		height: 100svh;
+		padding-bottom: 0.5rem;
+	}
+
+	.controls-row {
+		display: flex;
+		flex-wrap: nowrap;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.manual-input {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.25rem;
+		flex: 1 1 auto;
+	}
+
+	.manual-input span {
+		white-space: nowrap;
+	}
+
+	.manual-input input {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.btn {
+		flex: 0 0 auto;
+		white-space: nowrap;
+	}
+
+	.grid {
+		grid-template-columns: repeat(10, minmax(0, 1fr));
+	}
+
+	.axis {
+		display: none;
+	}
+
+	.tickets-table {
+		min-width: 970px;
 	}
 }
 
 @media (max-width: 480px) and (max-height: 740px) {
+	:root {
+		--help-tooltip-font-size: 0.78rem;
+		--ticket-tooltip-font-size: 0.74rem;
+	}
+
 	.grid-wrap {
 		max-height: 48svh;
 		overflow-y: auto;
 	}
 
 	.help-tip {
-		font-size: 0.78rem;
+		font-size: var(--help-tooltip-font-size);
 	}
 }

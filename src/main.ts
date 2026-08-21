@@ -1,26 +1,42 @@
 import "./style.css";
 import { clearCalledNumbers, getTotalBingoNumbers, toggleCalledNumber } from "./bingo";
 import { BINGO_MAX, BINGO_MIN, isValidBingoNumber } from "./config";
-import { countTicketHits, parseTicketsPayload, sortTicketsByNameThenId, type Ticket } from "./tickets";
+import { countTicketHits, parseTicketsPayload, sortTicketsById, type Ticket } from "./tickets";
 import { querySelectorOrThrow } from "./ui/dom";
 import { renderNumbersGrid, resetGridSelection, setNumberButtonState } from "./ui/grid";
 import { renderStatus, type StatusElements } from "./ui/status";
 import { getAppTemplate } from "./ui/template";
-import { renderTicketsTable, resetTicketMatrixState, setTicketNumberState, updateTicketRowState, type TicketTableView } from "./ui/tickets";
+import {
+	renderTicketsTable,
+	reorderTicketRows,
+	resetTicketMatrixState,
+	setTicketNumberState,
+	updateTicketRowState,
+	type TicketTableView,
+} from "./ui/tickets";
+
+	type SortMode = "hits" | "fixed";
 
 const app = querySelectorOrThrow<HTMLDivElement>("#app");
 const calledNumbers = new Set<number>();
 const totalNumbers = getTotalBingoNumbers(BINGO_MIN, BINGO_MAX);
 
 let tickets: Ticket[] = [];
-let ticketTableView: TicketTableView = { rows: [], numberCellIndex: new Map<number, HTMLTableCellElement[]>() };
+let ticketTableView: TicketTableView = {
+	rows: [],
+	numberCellIndex: new Map<number, HTMLTableCellElement[]>(),
+	tbody: document.createElement("tbody"),
+};
 let ticketHits: number[] = [];
 let ticketIndexByNumber = new Map<number, number[]>();
+let sortMode: SortMode = "hits";
 
 app.innerHTML = getAppTemplate(totalNumbers);
 
 const tabControl = querySelectorOrThrow<HTMLButtonElement>("#tab-control", app);
 const tabTickets = querySelectorOrThrow<HTMLButtonElement>("#tab-tickets", app);
+const tabTicketsAlert = querySelectorOrThrow<HTMLElement>("#tab-tickets-alert", app);
+const tabTicketsAlertLabel = querySelectorOrThrow<HTMLElement>("#tab-tickets-alert-label", app);
 const panelControl = querySelectorOrThrow<HTMLElement>("#panel-control", app);
 const panelTickets = querySelectorOrThrow<HTMLElement>("#panel-tickets", app);
 
@@ -28,6 +44,7 @@ const grid = querySelectorOrThrow<HTMLDivElement>("#numbers-grid", app);
 const clearBtn = querySelectorOrThrow<HTMLButtonElement>("#clear-btn", app);
 const manualBtn = querySelectorOrThrow<HTMLButtonElement>("#manual-btn", app);
 const manualInput = querySelectorOrThrow<HTMLInputElement>("#manual-number", app);
+const helpTip = querySelectorOrThrow<HTMLElement>("#help-tip", app);
 
 const statusElements: StatusElements = {
 	countLabel: querySelectorOrThrow<HTMLElement>("#count", app),
@@ -38,9 +55,31 @@ const statusElements: StatusElements = {
 const completedCountLabel = querySelectorOrThrow<HTMLElement>("#completed-count", app);
 
 const ticketsTotal = querySelectorOrThrow<HTMLElement>("#tickets-total", app);
-const ticketsInvalid = querySelectorOrThrow<HTMLElement>("#tickets-invalid", app);
+const ticketsStateChip = querySelectorOrThrow<HTMLElement>("#tickets-state-chip", app);
+const ticketsStateIcon = querySelectorOrThrow<HTMLElement>("#tickets-state-icon", app);
+const ticketsStateText = querySelectorOrThrow<HTMLElement>("#tickets-state-text", app);
 const ticketsInvalidList = querySelectorOrThrow<HTMLElement>("#tickets-invalid-list", app);
 const ticketsBody = querySelectorOrThrow<HTMLTableSectionElement>("#tickets-body", app);
+const sortHitsBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-hits-btn", app);
+const sortFixedBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-fixed-btn", app);
+
+const HELP_TEXT = {
+	control:
+		"Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar la partida cuando quieras.",
+	tickets:
+		"Explora cartones con orden por aciertos o ID fijo. El encabezado y la columna ID quedan fijos mientras recorres la tabla.",
+};
+
+const updateHelpTip = (showTickets: boolean): void => {
+	helpTip.textContent = showTickets ? HELP_TEXT.tickets : HELP_TEXT.control;
+};
+
+const updateSortButtons = (): void => {
+	sortHitsBtn.classList.toggle("is-active", sortMode === "hits");
+	sortFixedBtn.classList.toggle("is-active", sortMode === "fixed");
+	sortHitsBtn.setAttribute("aria-pressed", String(sortMode === "hits"));
+	sortFixedBtn.setAttribute("aria-pressed", String(sortMode === "fixed"));
+};
 
 const updateTabs = (showTickets: boolean): void => {
 	tabControl.classList.toggle("is-active", !showTickets);
@@ -50,15 +89,41 @@ const updateTabs = (showTickets: boolean): void => {
 
 	panelControl.hidden = showTickets;
 	panelTickets.hidden = !showTickets;
+	app.classList.toggle("is-tickets-view", showTickets);
+	updateHelpTip(showTickets);
 };
 
 const refreshStatus = (): void => {
 	renderStatus(statusElements, calledNumbers, totalNumbers);
 };
 
+const getRankedTicketIndexes = (): number[] => {
+	const ranked = ticketHits.map((hits, index) => ({ hits, index }));
+
+	ranked.sort((a, b) => {
+		if (sortMode === "hits" && b.hits !== a.hits) {
+			return b.hits - a.hits;
+		}
+
+		return tickets[a.index].id.localeCompare(tickets[b.index].id, undefined, {
+			numeric: true,
+			sensitivity: "base",
+		});
+	});
+
+	return ranked.map((item) => item.index);
+};
+
+const updateTicketsTabAlert = (hasCompletedTickets: boolean): void => {
+	tabTickets.classList.toggle("has-alert", hasCompletedTickets);
+	tabTicketsAlert.hidden = !hasCompletedTickets;
+	tabTicketsAlertLabel.hidden = !hasCompletedTickets;
+};
+
 const updateCompletedCount = (): void => {
 	const completedCount = ticketHits.filter((hits) => hits === 15).length;
 	completedCountLabel.textContent = String(completedCount);
+	updateTicketsTabAlert(completedCount > 0);
 };
 
 const recalculateTicketHits = (): void => {
@@ -67,6 +132,8 @@ const recalculateTicketHits = (): void => {
 	ticketHits.forEach((hits, index) => {
 		updateTicketRowState(ticketTableView, index, hits, hits === 15);
 	});
+
+	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
 
 	updateCompletedCount();
 };
@@ -101,6 +168,8 @@ const updateTicketHitsByToggle = (value: number, isNowMarked: boolean): void => 
 		updateTicketRowState(ticketTableView, ticketIndex, boundedHits, boundedHits === 15);
 	});
 
+	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
+
 	updateCompletedCount();
 };
 
@@ -117,15 +186,25 @@ const applyNumberToggle = (value: number, isNowMarked: boolean): void => {
 };
 
 const renderTicketLoadStatus = (invalidRows: string[]): void => {
-	ticketsTotal.textContent = String(tickets.length);
-	ticketsInvalid.textContent = String(invalidRows.length);
+	const invalidCount = invalidRows.length;
+	const summaryDetail = invalidRows.join(" | ");
 
-	if (invalidRows.length === 0) {
-		ticketsInvalidList.textContent = "No hay errores de carga.";
+	ticketsTotal.textContent = String(tickets.length);
+	ticketsStateChip.classList.toggle("is-ok", invalidCount === 0);
+	ticketsStateChip.classList.toggle("is-error", invalidCount > 0);
+	ticketsStateChip.setAttribute("aria-label", invalidCount === 0 ? "Sin errores de carga" : `Errores de carga detectados: ${invalidCount}`);
+	ticketsStateChip.setAttribute("title", invalidCount === 0 ? "Sin errores de carga" : summaryDetail);
+
+	if (invalidCount === 0) {
+		ticketsStateIcon.textContent = "✓";
+		ticketsStateText.textContent = "Sin errores";
+		ticketsInvalidList.textContent = "Sin errores de carga.";
 		return;
 	}
 
-	ticketsInvalidList.textContent = `Invalidos: ${invalidRows.join(" | ")}`;
+	ticketsStateIcon.textContent = "!";
+	ticketsStateText.textContent = `${invalidCount} error${invalidCount > 1 ? "es" : ""}`;
+	ticketsInvalidList.textContent = `Invalidos: ${summaryDetail}`;
 };
 
 const loadTickets = async (): Promise<void> => {
@@ -139,7 +218,7 @@ const loadTickets = async (): Promise<void> => {
 
 		const payload = (await response.json()) as unknown;
 		const parsed = parseTicketsPayload(payload);
-		tickets = sortTicketsByNameThenId(parsed.tickets);
+		tickets = sortTicketsById(parsed.tickets);
 
 		rebuildTicketIndexes();
 		ticketTableView = renderTicketsTable(ticketsBody, tickets);
@@ -198,5 +277,19 @@ tabTickets.addEventListener("click", () => {
 	updateTabs(true);
 });
 
+sortHitsBtn.addEventListener("click", () => {
+	sortMode = "hits";
+	updateSortButtons();
+	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
+});
+
+sortFixedBtn.addEventListener("click", () => {
+	sortMode = "fixed";
+	updateSortButtons();
+	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
+});
+
 void loadTickets();
+updateSortButtons();
 refreshStatus();
+updateHelpTip(false);

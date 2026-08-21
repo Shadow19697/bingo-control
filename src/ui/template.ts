@@ -15,7 +15,7 @@ export function getAppTemplate(totalNumbers: number): string {
         </button>
         <div class="help-tip" id="help-tip" role="tooltip">
           Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar
-          la ronda cuando quieras.
+          la partida cuando quieras.
         </div>
       </header>
 
@@ -25,6 +25,8 @@ export function getAppTemplate(totalNumbers: number): string {
         </button>
         <button id="tab-tickets" class="tab-btn" type="button" aria-selected="false">
           Cartones
+          <span id="tab-tickets-alert-label" class="tab-alert-label" hidden>Nuevo</span>
+          <span id="tab-tickets-alert" class="tab-alert-dot" hidden aria-hidden="true"></span>
         </button>
       </section>
 
@@ -46,7 +48,7 @@ export function getAppTemplate(totalNumbers: number): string {
           </div>
         </section>
 
-        <section>
+        <section class="control-grid-section">
           <div class="grid-wrap">
             <div class="grid" id="numbers-grid" aria-label="Grilla de numeros de bingo"></div>
           </div>
@@ -64,39 +66,52 @@ export function getAppTemplate(totalNumbers: number): string {
 
       <section id="panel-tickets" class="panel" aria-label="Vista de cartones" hidden>
         <section class="summary" aria-live="polite" aria-label="Estado de carga de cartones">
-          <div class="status-row">
-            <p class="status-chip"><strong id="tickets-total">0</strong> cartones cargados</p>
-            <p class="status-chip"><strong id="tickets-invalid">0</strong> cartones invalidos</p>
-            <p class="status-chip"><strong id="completed-count">0</strong> cartones completos</p>
+          <div class="status-row tickets-status-row">
+            <p class="status-chip"><strong id="tickets-total">0</strong> cargados</p>
+            <p class="status-chip"><strong id="completed-count">0</strong> completos</p>
+            <p id="tickets-state-chip" class="status-chip tickets-state-chip" tabindex="0">
+              <span id="tickets-state-icon" aria-hidden="true">✓</span>
+              <span id="tickets-state-text">Sin errores</span>
+            </p>
           </div>
-          <p class="called-list" id="tickets-invalid-list">No hay errores de carga.</p>
+          <p class="sr-only" id="tickets-invalid-list" aria-label="Estado de validacion">Sin errores de carga.</p>
         </section>
 
         <section class="tickets-wrap" aria-label="Matriz de cartones">
-          <table class="tickets-table" id="tickets-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>N1</th>
-                <th>N2</th>
-                <th>N3</th>
-                <th>N4</th>
-                <th>N5</th>
-                <th>N6</th>
-                <th>N7</th>
-                <th>N8</th>
-                <th>N9</th>
-                <th>N10</th>
-                <th>N11</th>
-                <th>N12</th>
-                <th>N13</th>
-                <th>N14</th>
-                <th>N15</th>
-              </tr>
-            </thead>
-            <tbody id="tickets-body"></tbody>
-          </table>
+          <div class="tickets-controls" role="group" aria-label="Orden de cartones">
+            <button id="sort-hits-btn" class="sort-btn is-active" type="button" aria-pressed="true">
+              Aciertos
+            </button>
+            <button id="sort-fixed-btn" class="sort-btn" type="button" aria-pressed="false">
+              Fijo ID
+            </button>
+          </div>
+
+          <div class="tickets-table-scroll" aria-label="Tabla de cartones">
+            <table class="tickets-table" id="tickets-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>N1</th>
+                  <th>N2</th>
+                  <th>N3</th>
+                  <th>N4</th>
+                  <th>N5</th>
+                  <th>N6</th>
+                  <th>N7</th>
+                  <th>N8</th>
+                  <th>N9</th>
+                  <th>N10</th>
+                  <th>N11</th>
+                  <th>N12</th>
+                  <th>N13</th>
+                  <th>N14</th>
+                  <th>N15</th>
+                </tr>
+              </thead>
+              <tbody id="tickets-body"></tbody>
+            </table>
+          </div>
         </section>
       </section>
     </main>
