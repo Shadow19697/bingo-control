@@ -1,4 +1,5 @@
 import { BINGO_MAX, BINGO_MIN } from "../config";
+import { version } from "../../package.json";
 
 export function getAppTemplate(totalNumbers: number): string {
 	return `
@@ -17,6 +18,7 @@ export function getAppTemplate(totalNumbers: number): string {
           Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar
           la partida cuando quieras.
         </div>
+        <span class="app-version">v${version}</span>
       </header>
 
       <section class="tabs" aria-label="Vistas de control">
