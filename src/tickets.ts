@@ -139,23 +139,8 @@ export function countTicketHits(ticket: Ticket, calledNumbers: Set<number>): num
 	return ticket.numbers.reduce((acc, value) => acc + (calledNumbers.has(value) ? 1 : 0), 0);
 }
 
-export function sortTicketsByNameThenId(source: Ticket[]): Ticket[] {
-	return [...source].sort((a, b) => {
-		const nameA = a.name?.toLocaleLowerCase() ?? "";
-		const nameB = b.name?.toLocaleLowerCase() ?? "";
-
-		if (nameA.length === 0 && nameB.length > 0) {
-			return 1;
-		}
-
-		if (nameB.length === 0 && nameA.length > 0) {
-			return -1;
-		}
-
-		if (nameA !== nameB) {
-			return nameA.localeCompare(nameB);
-		}
-
-		return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" });
-	});
+export function sortTicketsById(source: Ticket[]): Ticket[] {
+	return [...source].sort((a, b) =>
+		a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" })
+	);
 }

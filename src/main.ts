@@ -6,16 +6,9 @@ import { querySelectorOrThrow } from "./ui/dom";
 import { renderNumbersGrid, resetGridSelection, setNumberButtonState } from "./ui/grid";
 import { renderStatus, type StatusElements } from "./ui/status";
 import { getAppTemplate } from "./ui/template";
-import {
-	renderTicketsTable,
-	reorderTicketRows,
-	resetTicketMatrixState,
-	setTicketNumberState,
-	updateTicketRowState,
-	type TicketTableView,
-} from "./ui/tickets";
+import { renderTicketsTable, reorderTicketRows, resetTicketMatrixState, setTicketNumberState, updateTicketRowState, type TicketTableView } from "./ui/tickets";
 
-	type SortMode = "hits" | "fixed";
+type SortMode = "hits" | "fixed";
 
 const app = querySelectorOrThrow<HTMLDivElement>("#app");
 const calledNumbers = new Set<number>();
@@ -64,10 +57,8 @@ const sortHitsBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-hits-btn", ap
 const sortFixedBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-fixed-btn", app);
 
 const HELP_TEXT = {
-	control:
-		"Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar la partida cuando quieras.",
-	tickets:
-		"Explora cartones con orden por aciertos o ID fijo. El encabezado y la columna ID quedan fijos mientras recorres la tabla.",
+	control: "Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar la partida cuando quieras.",
+	tickets: "Explora cartones con orden por aciertos o ID fijo. El encabezado y la columna ID quedan fijos mientras recorres la tabla.",
 };
 
 const updateHelpTip = (showTickets: boolean): void => {

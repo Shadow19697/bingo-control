@@ -152,9 +152,7 @@ function updateTicketTooltipPlacement(details: HTMLDetailsElement): void {
 	const nextRow = row?.nextElementSibling as HTMLTableRowElement | null;
 	const nextRowTop = nextRow?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
 
-	let shouldFlipUp = isMobilePortrait
-		? hasRoomAbove || (!hasRoomBelow && spaceAbove > spaceBelow)
-		: !hasRoomBelow && spaceAbove > spaceBelow;
+	let shouldFlipUp = isMobilePortrait ? hasRoomAbove || (!hasRoomBelow && spaceAbove > spaceBelow) : !hasRoomBelow && spaceAbove > spaceBelow;
 	let shouldUsePortal = false;
 
 	if (shouldFlipUp) {
@@ -212,7 +210,7 @@ function bindTicketTooltipBehavior(details: HTMLDetailsElement): void {
 				updateTicketTooltipPlacement(details);
 			}
 		},
-		{ passive: true, capture: true }
+		{ passive: true, capture: true },
 	);
 }
 
