@@ -1,12 +1,24 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "bingo-control",
+	"main": "worker/index.ts",
 	"compatibility_date": "2026-08-20",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "bingo_control_db",
+			"database_id": "REEMPLAZAR_CON_DATABASE_ID"
+		}
+	],
+	"vars": {
+		"SESSION_TTL_MINUTES": "30",
+		"ADMIN_USERNAME": "admin"
+	},
 	"assets": {
 		"directory": "./dist",
-		"not_found_handling": "single-page-application",
+		"not_found_handling": "single-page-application"
 	},
 	"observability": {
-		"enabled": true,
-	},
+		"enabled": true
+	}
 }

@@ -1,7 +1,10 @@
 import "./style.css";
+import { ApiError, createTicket, deleteAllTickets, deleteTicket, fetchTicketsFromApi, getSession, importTickets, login, logout, updateTicket } from "./api";
 import { clearCalledNumbers, getTotalBingoNumbers, toggleCalledNumber } from "./bingo";
 import { BINGO_MAX, BINGO_MIN, isValidBingoNumber } from "./config";
-import { countTicketHits, parseTicketsPayload, sortTicketsById, type Ticket } from "./tickets";
+import { actionIcons, authIcons } from "./icons";
+import { parseBulkTicketsInput, parseTicketNumbersInput } from "./management";
+import { countTicketHits, parseTicketsPayload, sortTicketsById, type InvalidTicket, type Ticket } from "./tickets";
 import { querySelectorOrThrow } from "./ui/dom";
 import { renderNumbersGrid, resetGridSelection, setNumberButtonState } from "./ui/grid";
 import { renderStatus, type StatusElements } from "./ui/status";
@@ -9,12 +12,14 @@ import { getAppTemplate } from "./ui/template";
 import { renderTicketsTable, reorderTicketRows, resetTicketMatrixState, setTicketNumberState, updateTicketRowState, type TicketTableView } from "./ui/tickets";
 
 type SortMode = "hits" | "fixed";
+type ActiveTab = "control" | "tickets" | "management";
 
 const app = querySelectorOrThrow<HTMLDivElement>("#app");
 const calledNumbers = new Set<number>();
 const totalNumbers = getTotalBingoNumbers(BINGO_MIN, BINGO_MAX);
 
 let tickets: Ticket[] = [];
+let editingTicketId: string | null = null;
 let ticketTableView: TicketTableView = {
 	rows: [],
 	numberCellIndex: new Map<number, HTMLTableCellElement[]>(),
@@ -23,21 +28,34 @@ let ticketTableView: TicketTableView = {
 let ticketHits: number[] = [];
 let ticketIndexByNumber = new Map<number, number[]>();
 let sortMode: SortMode = "hits";
+let isAuthenticated = false;
 
 app.innerHTML = getAppTemplate(totalNumbers);
 
 const tabControl = querySelectorOrThrow<HTMLButtonElement>("#tab-control", app);
 const tabTickets = querySelectorOrThrow<HTMLButtonElement>("#tab-tickets", app);
+const tabManagement = querySelectorOrThrow<HTMLButtonElement>("#tab-management", app);
 const tabTicketsAlert = querySelectorOrThrow<HTMLElement>("#tab-tickets-alert", app);
 const tabTicketsAlertLabel = querySelectorOrThrow<HTMLElement>("#tab-tickets-alert-label", app);
 const panelControl = querySelectorOrThrow<HTMLElement>("#panel-control", app);
 const panelTickets = querySelectorOrThrow<HTMLElement>("#panel-tickets", app);
+const panelManagement = querySelectorOrThrow<HTMLElement>("#panel-management", app);
 
 const grid = querySelectorOrThrow<HTMLDivElement>("#numbers-grid", app);
 const clearBtn = querySelectorOrThrow<HTMLButtonElement>("#clear-btn", app);
 const manualBtn = querySelectorOrThrow<HTMLButtonElement>("#manual-btn", app);
 const manualInput = querySelectorOrThrow<HTMLInputElement>("#manual-number", app);
 const helpTip = querySelectorOrThrow<HTMLElement>("#help-tip", app);
+const authOpenBtn = querySelectorOrThrow<HTMLButtonElement>("#auth-open-btn", app);
+const authOpenIcon = querySelectorOrThrow<HTMLElement>("#auth-open-icon", app);
+const authModal = querySelectorOrThrow<HTMLElement>("#auth-modal", app);
+const authModalBackdrop = querySelectorOrThrow<HTMLButtonElement>("#auth-modal-backdrop", app);
+const authCloseBtn = querySelectorOrThrow<HTMLButtonElement>("#auth-close-btn", app);
+const authError = querySelectorOrThrow<HTMLElement>("#auth-error", app);
+const authForm = querySelectorOrThrow<HTMLFormElement>("#auth-form", app);
+const authUserInput = querySelectorOrThrow<HTMLInputElement>("#auth-user", app);
+const authPassInput = querySelectorOrThrow<HTMLInputElement>("#auth-pass", app);
+const authLoginBtn = querySelectorOrThrow<HTMLButtonElement>("#auth-login-btn", app);
 
 const statusElements: StatusElements = {
 	countLabel: querySelectorOrThrow<HTMLElement>("#count", app),
@@ -56,13 +74,47 @@ const ticketsBody = querySelectorOrThrow<HTMLTableSectionElement>("#tickets-body
 const sortHitsBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-hits-btn", app);
 const sortFixedBtn = querySelectorOrThrow<HTMLButtonElement>("#sort-fixed-btn", app);
 
+const ticketModal = querySelectorOrThrow<HTMLElement>("#ticket-modal", app);
+const ticketModalBackdrop = querySelectorOrThrow<HTMLButtonElement>("#ticket-modal-backdrop", app);
+const ticketModalCloseBtn = querySelectorOrThrow<HTMLButtonElement>("#ticket-modal-close-btn", app);
+const ticketModalTitle = querySelectorOrThrow<HTMLElement>("#ticket-modal-title", app);
+const openTicketModalBtn = querySelectorOrThrow<HTMLButtonElement>("#open-ticket-modal-btn", app);
+const ticketForm = querySelectorOrThrow<HTMLFormElement>("#ticket-form", app);
+const ticketIdInput = querySelectorOrThrow<HTMLInputElement>("#ticket-id-input", app);
+const ticketNameInput = querySelectorOrThrow<HTMLInputElement>("#ticket-name-input", app);
+const ticketNumbersInput = querySelectorOrThrow<HTMLInputElement>("#ticket-numbers-input", app);
+const ticketFormError = querySelectorOrThrow<HTMLElement>("#ticket-form-error", app);
+const ticketClearFormBtn = querySelectorOrThrow<HTMLButtonElement>("#ticket-clear-form-btn", app);
+const toast = querySelectorOrThrow<HTMLElement>("#toast", app);
+const managementTicketsBody = querySelectorOrThrow<HTMLTableSectionElement>("#management-tickets-body", app);
+const bulkModal = querySelectorOrThrow<HTMLElement>("#bulk-modal", app);
+const bulkModalBackdrop = querySelectorOrThrow<HTMLButtonElement>("#bulk-modal-backdrop", app);
+const bulkModalCloseBtn = querySelectorOrThrow<HTMLButtonElement>("#bulk-modal-close-btn", app);
+const openBulkModalBtn = querySelectorOrThrow<HTMLButtonElement>("#open-bulk-modal-btn", app);
+const bulkInput = querySelectorOrThrow<HTMLTextAreaElement>("#bulk-input", app);
+const bulkLoadBtn = querySelectorOrThrow<HTMLButtonElement>("#bulk-load-btn", app);
+const bulkClearBtn = querySelectorOrThrow<HTMLButtonElement>("#bulk-clear-btn", app);
+const bulkError = querySelectorOrThrow<HTMLElement>("#bulk-error", app);
+const deleteAllBtn = querySelectorOrThrow<HTMLButtonElement>("#delete-all-btn", app);
+
 const HELP_TEXT = {
 	control: "Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar la partida cuando quieras.",
 	tickets: "Explora cartones con orden por aciertos o ID fijo. El encabezado y la columna ID quedan fijos mientras recorres la tabla.",
+	management: "Gestiona cartones con alta, edicion y borrado. Las acciones impactan de inmediato en la vista de Cartones.",
 };
 
-const updateHelpTip = (showTickets: boolean): void => {
-	helpTip.textContent = showTickets ? HELP_TEXT.tickets : HELP_TEXT.control;
+const updateHelpTip = (tab: ActiveTab): void => {
+	if (tab === "tickets") {
+		helpTip.textContent = HELP_TEXT.tickets;
+		return;
+	}
+
+	if (tab === "management") {
+		helpTip.textContent = HELP_TEXT.management;
+		return;
+	}
+
+	helpTip.textContent = HELP_TEXT.control;
 };
 
 const updateSortButtons = (): void => {
@@ -72,16 +124,29 @@ const updateSortButtons = (): void => {
 	sortFixedBtn.setAttribute("aria-pressed", String(sortMode === "fixed"));
 };
 
-const updateTabs = (showTickets: boolean): void => {
-	tabControl.classList.toggle("is-active", !showTickets);
-	tabControl.setAttribute("aria-selected", String(!showTickets));
+const setProtectedTabsVisibility = (visible: boolean): void => {
+	tabTickets.hidden = !visible;
+	tabManagement.hidden = !visible;
+};
+
+const updateTabs = (nextTab: ActiveTab): void => {
+	const showControl = nextTab === "control";
+	const showTickets = nextTab === "tickets";
+	const showManagement = nextTab === "management";
+
+	tabControl.classList.toggle("is-active", showControl);
+	tabControl.setAttribute("aria-selected", String(showControl));
 	tabTickets.classList.toggle("is-active", showTickets);
 	tabTickets.setAttribute("aria-selected", String(showTickets));
+	tabManagement.classList.toggle("is-active", showManagement);
+	tabManagement.setAttribute("aria-selected", String(showManagement));
 
-	panelControl.hidden = showTickets;
+	panelControl.hidden = !showControl;
 	panelTickets.hidden = !showTickets;
+	panelManagement.hidden = !showManagement;
 	app.classList.toggle("is-tickets-view", showTickets);
-	updateHelpTip(showTickets);
+	app.classList.toggle("is-management-view", showManagement);
+	updateHelpTip(nextTab);
 };
 
 const refreshStatus = (): void => {
@@ -117,6 +182,246 @@ const updateCompletedCount = (): void => {
 	updateTicketsTabAlert(completedCount > 0);
 };
 
+const resetTicketForm = (): void => {
+	ticketForm.reset();
+	editingTicketId = null;
+	ticketModalTitle.textContent = "Cargar carton";
+};
+
+const clearTicketFormMessages = (): void => {
+	ticketFormError.hidden = true;
+};
+
+const FIELD_LABELS: Record<"id" | "name" | "numbers", string> = {
+	id: "ID",
+	name: "Nombre",
+	numbers: "Numeros",
+};
+
+const showTicketFormError = (message: string, field?: "id" | "name" | "numbers"): void => {
+	ticketFormError.textContent = field ? `${FIELD_LABELS[field]}: ${message}` : message;
+	ticketFormError.hidden = false;
+};
+
+const showTicketFormErrors = (invalidTickets: InvalidTicket[]): void => {
+	const list = document.createElement("ul");
+	list.className = "bulk-preview-list";
+
+	invalidTickets.forEach((invalid) => {
+		const item = document.createElement("li");
+		const fieldLabel = invalid.field ? FIELD_LABELS[invalid.field] : "Formato";
+		item.textContent = `${fieldLabel}: ${invalid.reason}`;
+		list.appendChild(item);
+	});
+
+	ticketFormError.innerHTML = "";
+	ticketFormError.appendChild(list);
+	ticketFormError.hidden = false;
+};
+
+let toastTimeoutId: number | undefined;
+
+const showToast = (message: string, variant: "success" | "error" = "success"): void => {
+	toast.textContent = message;
+	toast.classList.toggle("is-error", variant === "error");
+	toast.classList.add("is-visible");
+
+	if (toastTimeoutId) {
+		window.clearTimeout(toastTimeoutId);
+	}
+
+	toastTimeoutId = window.setTimeout(() => {
+		toast.classList.remove("is-visible");
+	}, 3200);
+};
+
+const clearBulkMessages = (): void => {
+	bulkError.hidden = true;
+	bulkError.innerHTML = "";
+};
+
+const showBulkError = (message: string): void => {
+	bulkError.textContent = message;
+	bulkError.hidden = false;
+};
+
+const showBulkFieldErrors = (invalidTickets: InvalidTicket[]): void => {
+	const list = document.createElement("ul");
+	list.className = "bulk-preview-list";
+
+	invalidTickets.forEach((invalid) => {
+		const item = document.createElement("li");
+		const fieldLabel = invalid.field ? FIELD_LABELS[invalid.field] : "Formato";
+		item.textContent = `Carton ${invalid.index + 1}: ${fieldLabel} — ${invalid.reason}`;
+		list.appendChild(item);
+	});
+
+	bulkError.innerHTML = "";
+	bulkError.appendChild(list);
+	bulkError.hidden = false;
+};
+
+const openAuthModal = (): void => {
+	authModal.hidden = false;
+	authUserInput.focus();
+};
+
+const closeAuthModal = (): void => {
+	authModal.hidden = true;
+};
+
+const openTicketModal = (mode: "create" | "edit", ticket?: Ticket): void => {
+	clearTicketFormMessages();
+
+	if (mode === "edit" && ticket) {
+		editingTicketId = ticket.id;
+		ticketIdInput.value = ticket.id;
+		ticketNameInput.value = ticket.name ?? "";
+		ticketNumbersInput.value = ticket.numbers.join(", ");
+		ticketModalTitle.textContent = `Editar carton ${ticket.id}`;
+	} else {
+		resetTicketForm();
+	}
+
+	ticketModal.hidden = false;
+	ticketIdInput.focus();
+};
+
+const closeTicketModal = (): void => {
+	ticketModal.hidden = true;
+	resetTicketForm();
+	clearTicketFormMessages();
+};
+
+const openBulkModal = (): void => {
+	bulkModal.hidden = false;
+};
+
+const closeBulkModal = (): void => {
+	bulkModal.hidden = true;
+	bulkInput.value = "";
+	clearBulkMessages();
+};
+
+const clearAuthError = (): void => {
+	authError.hidden = true;
+	authError.textContent = "";
+};
+
+const showAuthError = (message: string): void => {
+	authError.textContent = message;
+	authError.hidden = false;
+};
+
+const getLoginErrorMessage = (error: unknown): string => {
+	if (error instanceof ApiError) {
+		if (error.status === 401) {
+			return "Usuario o clave incorrectos.";
+		}
+
+		if (error.status === 404) {
+			return "El servicio de ingreso no esta disponible en este entorno.";
+		}
+	}
+
+	return "No se pudo iniciar sesion. Intenta nuevamente.";
+};
+
+const setAuthUi = (nextAuth: boolean): void => {
+	isAuthenticated = nextAuth;
+	authForm.hidden = nextAuth;
+	authOpenIcon.innerHTML = nextAuth ? authIcons.logout : authIcons.login;
+	authOpenBtn.classList.toggle("is-logout", nextAuth);
+	authOpenBtn.setAttribute("aria-label", nextAuth ? "Cerrar sesion" : "Abrir ingreso");
+	authOpenBtn.title = nextAuth ? "Cerrar sesion" : "Ingreso";
+	clearAuthError();
+	setProtectedTabsVisibility(nextAuth);
+
+	if (!nextAuth) {
+		updateTabs("control");
+		closeAuthModal();
+	}
+};
+
+const renderManagementRows = (): void => {
+	managementTicketsBody.innerHTML = "";
+	const fragment = document.createDocumentFragment();
+
+	tickets.forEach((ticket) => {
+		const row = document.createElement("tr");
+
+		const idCell = document.createElement("td");
+		idCell.textContent = ticket.id;
+
+		const nameCell = document.createElement("td");
+		nameCell.textContent = ticket.name ?? "-";
+
+		const numbersCell = document.createElement("td");
+
+		const numbersText = document.createElement("span");
+		numbersText.className = "mgmt-numbers-text";
+		numbersText.textContent = ticket.numbers.join(", ");
+
+		const numbersGrid = document.createElement("div");
+		numbersGrid.className = "mgmt-numbers-grid";
+		ticket.numbers.forEach((value) => {
+			const chip = document.createElement("span");
+			chip.className = "mgmt-number-chip";
+			chip.textContent = String(value);
+			numbersGrid.appendChild(chip);
+		});
+
+		numbersCell.append(numbersText, numbersGrid);
+
+		const actionsCell = document.createElement("td");
+		const actionsWrap = document.createElement("div");
+		actionsWrap.className = "management-actions";
+
+		const editBtn = document.createElement("button");
+		editBtn.type = "button";
+		editBtn.className = "row-icon-btn";
+		editBtn.innerHTML = actionIcons.edit;
+		editBtn.setAttribute("aria-label", `Editar carton ${ticket.id}`);
+		editBtn.title = "Editar";
+		editBtn.addEventListener("click", () => {
+			openTicketModal("edit", ticket);
+		});
+
+		const deleteBtn = document.createElement("button");
+		deleteBtn.type = "button";
+		deleteBtn.className = "row-icon-btn is-danger";
+		deleteBtn.innerHTML = actionIcons.delete;
+		deleteBtn.setAttribute("aria-label", `Borrar carton ${ticket.id}`);
+		deleteBtn.title = "Borrar";
+		deleteBtn.addEventListener("click", async () => {
+			const confirmed = window.confirm(`Vas a borrar el carton ${ticket.id}. Esta accion no se puede deshacer. ¿Continuar?`);
+
+			if (!confirmed) {
+				return;
+			}
+
+			try {
+				await deleteTicket(ticket.id);
+				await reloadTicketsAndViews();
+			} catch (error) {
+				handleError(error, "No se pudo borrar el carton.");
+			}
+		});
+
+		actionsWrap.appendChild(editBtn);
+		actionsWrap.appendChild(deleteBtn);
+		actionsCell.appendChild(actionsWrap);
+
+		row.appendChild(idCell);
+		row.appendChild(nameCell);
+		row.appendChild(numbersCell);
+		row.appendChild(actionsCell);
+		fragment.appendChild(row);
+	});
+
+	managementTicketsBody.appendChild(fragment);
+};
+
 const recalculateTicketHits = (): void => {
 	ticketHits = tickets.map((ticket) => countTicketHits(ticket, calledNumbers));
 
@@ -127,6 +432,12 @@ const recalculateTicketHits = (): void => {
 	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
 
 	updateCompletedCount();
+};
+
+const syncTicketNumberHighlights = (): void => {
+	calledNumbers.forEach((value) => {
+		setTicketNumberState(ticketTableView, value, true);
+	});
 };
 
 const clearRound = (): void => {
@@ -198,32 +509,72 @@ const renderTicketLoadStatus = (invalidRows: string[]): void => {
 	ticketsInvalidList.textContent = `Invalidos: ${summaryDetail}`;
 };
 
-const loadTickets = async (): Promise<void> => {
+const SESSION_EXPIRED_STORAGE_KEY = "bingo-session-expired";
+
+const handleUnauthorized = (error: unknown): boolean => {
+	if (error instanceof ApiError && error.status === 401) {
+		window.sessionStorage.setItem(SESSION_EXPIRED_STORAGE_KEY, "1");
+		window.location.reload();
+		return true;
+	}
+
+	return false;
+};
+
+const checkSessionExpiredNotice = (): void => {
+	if (window.sessionStorage.getItem(SESSION_EXPIRED_STORAGE_KEY)) {
+		window.sessionStorage.removeItem(SESSION_EXPIRED_STORAGE_KEY);
+		showToast("La sesion expiro. Inicia sesion nuevamente.", "error");
+	}
+};
+
+function handleError(error: unknown, fallbackMessage: string): void {
+	if (handleUnauthorized(error)) {
+		return;
+	}
+
+	if (error instanceof ApiError) {
+		renderTicketLoadStatus([error.message]);
+		return;
+	}
+
+	if (error instanceof Error) {
+		renderTicketLoadStatus([error.message]);
+		return;
+	}
+
+	renderTicketLoadStatus([fallbackMessage]);
+}
+
+const reloadTicketsAndViews = async (): Promise<void> => {
 	try {
-		const response = await fetch("/tickets.json", { cache: "no-store" });
-
-		if (!response.ok) {
-			renderTicketLoadStatus([`No se pudo cargar tickets.json (HTTP ${response.status}).`]);
-			return;
-		}
-
-		const payload = (await response.json()) as unknown;
-		const parsed = parseTicketsPayload(payload);
-		tickets = sortTicketsById(parsed.tickets);
+		tickets = sortTicketsById(await fetchTicketsFromApi());
 
 		rebuildTicketIndexes();
 		ticketTableView = renderTicketsTable(ticketsBody, tickets);
 		ticketHits = tickets.map((ticket) => countTicketHits(ticket, calledNumbers));
 		recalculateTicketHits();
+		syncTicketNumberHighlights();
+		renderManagementRows();
+		renderTicketLoadStatus([]);
+	} catch (error) {
+		handleError(error, "No se pudo cargar cartones desde la API.");
+	}
+};
 
-		const invalidRows = parsed.invalidTickets.map((entry) => {
-			const idPart = entry.rawId ? `ID ${entry.rawId}` : `fila ${entry.index + 1}`;
-			return `${idPart}: ${entry.reason}`;
-		});
+const initializeSession = async (): Promise<void> => {
+	try {
+		const session = await getSession();
 
-		renderTicketLoadStatus(invalidRows);
+		if (!session.authenticated) {
+			setAuthUi(false);
+			return;
+		}
+
+		setAuthUi(true);
+		await reloadTicketsAndViews();
 	} catch {
-		renderTicketLoadStatus(["No se pudo leer tickets.json. Revisa el formato JSON."]);
+		setAuthUi(false);
 	}
 };
 
@@ -260,12 +611,126 @@ manualInput.addEventListener("keydown", (event) => {
 	}
 });
 
+authForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	const username = authUserInput.value.trim();
+	const password = authPassInput.value;
+
+	if (!username || !password) {
+		showAuthError("Completa usuario y clave.");
+		return;
+	}
+
+	clearAuthError();
+
+	authLoginBtn.disabled = true;
+
+	try {
+		await login({ username, password });
+		setAuthUi(true);
+		authUserInput.value = "";
+		authPassInput.value = "";
+		await reloadTicketsAndViews();
+		closeAuthModal();
+		updateTabs("tickets");
+	} catch (error) {
+		showAuthError(getLoginErrorMessage(error));
+	} finally {
+		authLoginBtn.disabled = false;
+	}
+});
+
+const handleLogout = async (): Promise<void> => {
+	try {
+		await logout();
+	} finally {
+		setAuthUi(false);
+		tickets = [];
+		ticketTableView = renderTicketsTable(ticketsBody, tickets);
+		renderManagementRows();
+		renderTicketLoadStatus([]);
+	}
+};
+
+authOpenBtn.addEventListener("click", () => {
+	if (isAuthenticated) {
+		void handleLogout();
+		return;
+	}
+
+	openAuthModal();
+});
+
+authCloseBtn.addEventListener("click", () => {
+	closeAuthModal();
+});
+
+authModalBackdrop.addEventListener("click", () => {
+	closeAuthModal();
+});
+
+openTicketModalBtn.addEventListener("click", () => {
+	openTicketModal("create");
+});
+
+ticketModalCloseBtn.addEventListener("click", () => {
+	closeTicketModal();
+});
+
+ticketModalBackdrop.addEventListener("click", () => {
+	closeTicketModal();
+});
+
+openBulkModalBtn.addEventListener("click", () => {
+	openBulkModal();
+});
+
+bulkModalCloseBtn.addEventListener("click", () => {
+	closeBulkModal();
+});
+
+bulkModalBackdrop.addEventListener("click", () => {
+	closeBulkModal();
+});
+
+document.addEventListener("keydown", (event) => {
+	if (event.key !== "Escape") {
+		return;
+	}
+
+	if (!authModal.hidden) {
+		closeAuthModal();
+		return;
+	}
+
+	if (!ticketModal.hidden) {
+		closeTicketModal();
+		return;
+	}
+
+	if (!bulkModal.hidden) {
+		closeBulkModal();
+	}
+});
+
 tabControl.addEventListener("click", () => {
-	updateTabs(false);
+	updateTabs("control");
 });
 
 tabTickets.addEventListener("click", () => {
-	updateTabs(true);
+	if (!isAuthenticated) {
+		return;
+	}
+
+	updateTabs("tickets");
+});
+
+tabManagement.addEventListener("click", () => {
+	if (!isAuthenticated) {
+		return;
+	}
+
+	updateTabs("management");
 });
 
 sortHitsBtn.addEventListener("click", () => {
@@ -280,7 +745,123 @@ sortFixedBtn.addEventListener("click", () => {
 	reorderTicketRows(ticketTableView, getRankedTicketIndexes());
 });
 
-void loadTickets();
+ticketForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	clearTicketFormMessages();
+
+	const payload = {
+		tickets: [
+			{
+				id: ticketIdInput.value,
+				name: ticketNameInput.value,
+				numbers: parseTicketNumbersInput(ticketNumbersInput.value),
+			},
+		],
+	};
+
+	const existingIds = new Set(tickets.filter((existing) => existing.id !== editingTicketId).map((existing) => existing.id));
+	const parsed = parseTicketsPayload(payload, existingIds);
+	if (parsed.tickets.length === 0) {
+		showTicketFormErrors(parsed.invalidTickets);
+		return;
+	}
+
+	const ticket = parsed.tickets[0];
+
+	try {
+		const wasEditing = Boolean(editingTicketId);
+
+		if (editingTicketId) {
+			await updateTicket(editingTicketId, ticket);
+		} else {
+			await createTicket(ticket);
+		}
+
+		closeTicketModal();
+		showToast(wasEditing ? `Carton ${ticket.id} actualizado.` : `Carton ${ticket.id} cargado.`);
+		await reloadTicketsAndViews();
+	} catch (error) {
+		if (handleUnauthorized(error)) {
+			return;
+		}
+
+		const message = error instanceof ApiError || error instanceof Error ? error.message : "No se pudo guardar el carton.";
+		showTicketFormError(message);
+	}
+});
+
+ticketClearFormBtn.addEventListener("click", () => {
+	resetTicketForm();
+	clearTicketFormMessages();
+});
+
+bulkLoadBtn.addEventListener("click", async () => {
+	clearBulkMessages();
+
+	const existingIds = new Set(tickets.map((existing) => existing.id));
+
+	let parsed;
+	try {
+		parsed = parseBulkTicketsInput(bulkInput.value, existingIds);
+	} catch (error) {
+		showBulkError(error instanceof Error ? error.message : "No se pudo analizar el bloque de carga masiva.");
+		return;
+	}
+
+	if (parsed.invalidTickets.length > 0) {
+		showBulkFieldErrors(parsed.invalidTickets);
+		return;
+	}
+
+	if (parsed.tickets.length === 0) {
+		showBulkError("No se encontraron cartones para cargar.");
+		return;
+	}
+
+	try {
+		await importTickets(parsed.tickets);
+		const count = parsed.tickets.length;
+		closeBulkModal();
+		showToast(`Se cargaron ${count} cartones.`);
+		await reloadTicketsAndViews();
+	} catch (error) {
+		if (handleUnauthorized(error)) {
+			return;
+		}
+
+		showBulkError(error instanceof ApiError || error instanceof Error ? error.message : "No se pudo aplicar la carga masiva.");
+	}
+});
+
+bulkClearBtn.addEventListener("click", () => {
+	bulkInput.value = "";
+	clearBulkMessages();
+});
+
+deleteAllBtn.addEventListener("click", async () => {
+	const token = window.prompt('Para confirmar, escribe exactamente: BORRAR TODO');
+
+	if (token !== "BORRAR TODO") {
+		return;
+	}
+
+	const approved = window.confirm("Se eliminaran todos los cartones cargados. Esta accion no se puede deshacer. ¿Confirmas?");
+	if (!approved) {
+		return;
+	}
+
+	try {
+		await deleteAllTickets(token);
+		resetTicketForm();
+		await reloadTicketsAndViews();
+	} catch (error) {
+		handleError(error, "No se pudo borrar todo.");
+	}
+});
+
+checkSessionExpiredNotice();
+void initializeSession();
 updateSortButtons();
 refreshStatus();
-updateHelpTip(false);
+updateHelpTip("control");
+setProtectedTabsVisibility(false);

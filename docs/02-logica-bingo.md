@@ -12,11 +12,16 @@ Llevar control de numeros cantados en una partida y cruzarlos contra cartones ca
 - Debe existir accion para limpiar la partida completa.
 - Debe mostrarse cantidad de marcados y faltantes.
 - La lista de salida se muestra en orden cronologico de marcado.
-- Los cartones se cargan desde `public/tickets.json`.
-- Cada carton debe tener: `id` unico + `numbers` con 15 enteros unicos entre 1 y 90.
+- Los cartones se sirven desde la API del Worker (`GET /api/tickets`, respaldada en D1) — la
+  pestaña Cartones y Gestion siempre reflejan lo que hay en la base, no un archivo estatico.
+  `public/tickets.json` sigue existiendo solo como semilla para el entorno local
+  (`npm run db:local:seed`) y como referencia del formato.
+- Cada carton debe tener: `id` unico (entero positivo) + `numbers` con 15 enteros unicos entre 1 y 90.
 - `name` es opcional para identificar dueno o reserva del carton.
 - Un carton se considera completo cuando alcanza 15/15 aciertos.
 - El sistema muestra contador de cartones completos activos en la pestana Cartones.
+- El alta, edicion y borrado de cartones (ABM) vive en la pestaña Gestion, protegida por login —
+  ver `docs/03-abm-seguridad.md` para las reglas de validacion y las convenciones de esa UI.
 
 ## Flujo funcional
 
@@ -37,6 +42,8 @@ Llevar control de numeros cantados en una partida y cruzarlos contra cartones ca
 - `src/ui/status.ts`: resumen inferior de canto.
 - `src/ui/template.ts`: composicion HTML base + pestañas.
 - `src/main.ts`: orquestacion de eventos y sincronizacion entre canto y cartones.
+- `src/api.ts`, `src/management.ts`, `worker/`: acceso a datos, ABM y seguridad — ver
+  `docs/03-abm-seguridad.md`.
 
 ## Casos borde
 
@@ -48,6 +55,6 @@ Llevar control de numeros cantados en una partida y cruzarlos contra cartones ca
 
 ## Ideas para siguientes iteraciones
 
-- Persistencia de cartones desde backend/API.
-- Alta/Baja/Edicion de cartones desde la UI.
 - Exportar estado de partida (cantados + cartones completos).
+- Export/restauracion asistida de backup de cartones (hoy no existe, ver `docs/03-abm-seguridad.md`).
+- Multiusuario para el login administrador (hoy es un unico usuario).

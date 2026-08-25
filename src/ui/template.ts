@@ -1,4 +1,5 @@
 import { BINGO_MAX, BINGO_MIN } from "../config";
+import { actionIcons, authIcons } from "../icons";
 import { version } from "../../package.json";
 
 export function getAppTemplate(totalNumbers: number): string {
@@ -18,17 +19,104 @@ export function getAppTemplate(totalNumbers: number): string {
           Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar
           la partida cuando quieras.
         </div>
+        <button id="auth-open-btn" class="auth-open-btn icon-btn" type="button" aria-label="Abrir ingreso" title="Ingreso">
+          <span id="auth-open-icon" aria-hidden="true">${authIcons.login}</span>
+        </button>
         <span class="app-version">v${version}</span>
       </header>
+
+      <div id="auth-modal" class="modal" hidden>
+        <button id="auth-modal-backdrop" class="modal-backdrop" type="button" aria-label="Cerrar modal"></button>
+        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+          <div class="modal-head">
+            <h2 id="auth-modal-title">Ingreso</h2>
+            <button id="auth-close-btn" class="modal-close-btn icon-btn" type="button" aria-label="Cerrar ingreso" title="Cerrar">
+              <span aria-hidden="true">${authIcons.close}</span>
+            </button>
+          </div>
+          <p id="auth-error" class="auth-error" role="alert" hidden></p>
+          <form id="auth-form" class="auth-form" autocomplete="off">
+            <label>
+              <span>Usuario</span>
+              <input id="auth-user" name="username" type="text" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Clave</span>
+              <input id="auth-pass" name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button id="auth-login-btn" class="btn alt" type="submit">Ingresar</button>
+          </form>
+        </section>
+      </div>
+
+      <div id="ticket-modal" class="modal" hidden>
+        <button id="ticket-modal-backdrop" class="modal-backdrop" type="button" aria-label="Cerrar modal"></button>
+        <section class="modal-card is-wide" role="dialog" aria-modal="true" aria-labelledby="ticket-modal-title">
+          <div class="modal-head">
+            <h2 id="ticket-modal-title">Cargar carton</h2>
+            <button id="ticket-modal-close-btn" class="modal-close-btn icon-btn" type="button" aria-label="Cerrar" title="Cerrar">
+              <span aria-hidden="true">${authIcons.close}</span>
+            </button>
+          </div>
+          <form id="ticket-form" class="ticket-form" autocomplete="off">
+            <div class="ticket-form-grid">
+              <label>
+                <span>ID</span>
+                <input id="ticket-id-input" name="ticketId" type="text" inputmode="numeric" required />
+              </label>
+              <label>
+                <span>Nombre (opcional)</span>
+                <input id="ticket-name-input" name="ticketName" type="text" maxlength="60" />
+              </label>
+              <label class="ticket-form-full">
+                <span>Numeros (15 valores, separados por coma)</span>
+                <input id="ticket-numbers-input" name="ticketNumbers" type="text" placeholder="1, 4, 7, 12, ..." required />
+              </label>
+            </div>
+            <div class="ticket-form-actions">
+              <button id="ticket-save-btn" class="btn alt" type="submit">Guardar</button>
+              <button id="ticket-clear-form-btn" class="sort-btn" type="button">Limpiar formulario</button>
+            </div>
+            <div class="field-error" id="ticket-form-error" role="alert" hidden></div>
+          </form>
+        </section>
+      </div>
+
+      <div id="bulk-modal" class="modal" hidden>
+        <button id="bulk-modal-backdrop" class="modal-backdrop" type="button" aria-label="Cerrar modal"></button>
+        <section class="modal-card is-wide" role="dialog" aria-modal="true" aria-labelledby="bulk-modal-title">
+          <div class="modal-head">
+            <h2 id="bulk-modal-title">Cargar cartones</h2>
+            <button id="bulk-modal-close-btn" class="modal-close-btn icon-btn" type="button" aria-label="Cerrar" title="Cerrar">
+              <span aria-hidden="true">${authIcons.close}</span>
+            </button>
+          </div>
+          <section class="bulk-wrap" aria-label="Carga masiva">
+            <p class="bulk-hint">Acepta JSON con clave tickets o CSV por linea: id,nombre,n1..n15</p>
+            <p class="bulk-hint">Ejemplo CSV: 1001,Juan Perez,1,4,7,12,18,23,29,34,39,45,52,60,66,73,88</p>
+            <textarea id="bulk-input" rows="6" placeholder='{"tickets":[{"id":"1001","name":"Juan Perez","numbers":[1,4,7,12,18,23,29,34,39,45,52,60,66,73,88]}]}'></textarea>
+            <div class="ticket-form-actions">
+              <button id="bulk-load-btn" class="btn alt" type="button">Cargar cartones</button>
+              <button id="bulk-clear-btn" class="sort-btn" type="button">Limpiar bloque</button>
+            </div>
+            <div class="field-error" id="bulk-error" role="alert" hidden></div>
+          </section>
+        </section>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
       <section class="tabs" aria-label="Vistas de control">
         <button id="tab-control" class="tab-btn is-active" type="button" aria-selected="true">
           Control
         </button>
-        <button id="tab-tickets" class="tab-btn" type="button" aria-selected="false">
+        <button id="tab-tickets" class="tab-btn" type="button" aria-selected="false" hidden>
           Cartones
           <span id="tab-tickets-alert-label" class="tab-alert-label" hidden>Nuevo</span>
           <span id="tab-tickets-alert" class="tab-alert-dot" hidden aria-hidden="true"></span>
+        </button>
+        <button id="tab-management" class="tab-btn" type="button" aria-selected="false" hidden>
+          Gestion
         </button>
       </section>
 
@@ -114,6 +202,43 @@ export function getAppTemplate(totalNumbers: number): string {
               <tbody id="tickets-body"></tbody>
             </table>
           </div>
+        </section>
+      </section>
+
+      <section id="panel-management" class="panel" aria-label="Gestion de cartones" hidden>
+        <section class="management-wrap" aria-label="ABM de cartones">
+          <section class="ticket-list-wrap" aria-label="Cartones actuales para editar o borrar">
+            <div class="ticket-list-head">
+              <h2>Cartones actuales</h2>
+              <div class="ticket-list-actions">
+                <button id="open-ticket-modal-btn" class="btn alt" type="button" aria-label="Cargar carton" title="Cargar carton">
+                  <span class="btn-icon" aria-hidden="true">${actionIcons.addOne}</span>
+                  <span class="btn-label">Cargar carton</span>
+                </button>
+                <button id="open-bulk-modal-btn" class="btn alt" type="button" aria-label="Cargar cartones" title="Cargar cartones">
+                  <span class="btn-icon" aria-hidden="true">${actionIcons.addMany}</span>
+                  <span class="btn-label">Cargar cartones</span>
+                </button>
+                <button id="delete-all-btn" class="btn" type="button" aria-label="Borrar todos" title="Borrar todos">
+                  <span class="btn-icon" aria-hidden="true">${actionIcons.delete}</span>
+                  <span class="btn-label">Borrar todos</span>
+                </button>
+              </div>
+            </div>
+            <div class="management-table-scroll">
+              <table class="management-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Numeros</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="management-tickets-body"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </section>
     </main>

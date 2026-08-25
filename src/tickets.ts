@@ -10,7 +10,10 @@ export type InvalidTicket = {
 	index: number;
 	reason: string;
 	rawId?: string;
+	field?: "id" | "name" | "numbers";
 };
+
+export const TICKET_NAME_MAX_LENGTH = 60;
 
 export type LoadedTicketsResult = {
 	tickets: Ticket[];
@@ -23,19 +26,22 @@ type TicketPayload = {
 	numbers?: unknown;
 };
 
-function normalizeTicketId(rawId: unknown, index: number): string | null {
-	if (typeof rawId === "number" && Number.isFinite(rawId)) {
+const POSITIVE_INTEGER_ID_PATTERN = /^0*([1-9]\d*)$/;
+
+function normalizeTicketId(rawId: unknown): string | null {
+	if (typeof rawId === "number" && Number.isInteger(rawId) && rawId > 0) {
 		return String(rawId);
 	}
 
 	if (typeof rawId === "string") {
 		const trimmed = rawId.trim();
-		if (trimmed.length > 0) {
-			return trimmed;
+		const match = POSITIVE_INTEGER_ID_PATTERN.exec(trimmed);
+		if (match) {
+			return match[1];
 		}
 	}
 
-	return `INVALID-${index + 1}`;
+	return null;
 }
 
 function validateTicketNumbers(rawNumbers: unknown): number[] | null {
@@ -61,15 +67,6 @@ function validateTicketNumbers(rawNumbers: unknown): number[] | null {
 	return Array.from(unique).sort((a, b) => a - b);
 }
 
-function normalizeTicketName(rawName: unknown): string | undefined {
-	if (typeof rawName !== "string") {
-		return undefined;
-	}
-
-	const normalized = rawName.trim();
-	return normalized.length > 0 ? normalized : undefined;
-}
-
 function extractTicketList(payload: unknown): unknown[] {
 	if (Array.isArray(payload)) {
 		return payload;
@@ -83,7 +80,7 @@ function extractTicketList(payload: unknown): unknown[] {
 	return [];
 }
 
-export function parseTicketsPayload(payload: unknown): LoadedTicketsResult {
+export function parseTicketsPayload(payload: unknown, existingIds?: ReadonlySet<string>): LoadedTicketsResult {
 	const source = extractTicketList(payload);
 	const tickets: Ticket[] = [];
 	const invalidTickets: InvalidTicket[] = [];
@@ -91,40 +88,65 @@ export function parseTicketsPayload(payload: unknown): LoadedTicketsResult {
 
 	source.forEach((entry, index) => {
 		const raw = entry as TicketPayload;
-		const ticketId = normalizeTicketId(raw?.id, index);
+		const ticketId = normalizeTicketId(raw?.id);
 		const rawId = ticketId ?? undefined;
-		const normalizedNumbers = validateTicketNumbers(raw?.numbers);
+		let hasError = false;
 
 		if (!ticketId) {
 			invalidTickets.push({
 				index,
-				reason: "ID faltante o invalido.",
+				field: "id",
+				reason: "El ID debe ser un numero entero positivo.",
 			});
-			return;
-		}
-
-		if (usedIds.has(ticketId)) {
+			hasError = true;
+		} else if (usedIds.has(ticketId)) {
 			invalidTickets.push({
 				index,
 				rawId,
+				field: "id",
 				reason: `ID duplicado (${ticketId}).`,
 			});
-			return;
+			hasError = true;
+		} else if (existingIds?.has(ticketId)) {
+			invalidTickets.push({
+				index,
+				rawId,
+				field: "id",
+				reason: `El ID ${ticketId} ya fue ingresado.`,
+			});
+			hasError = true;
 		}
 
+		const trimmedName = typeof raw?.name === "string" ? raw.name.trim() : "";
+		if (trimmedName.length > TICKET_NAME_MAX_LENGTH) {
+			invalidTickets.push({
+				index,
+				rawId,
+				field: "name",
+				reason: `El nombre no puede superar los ${TICKET_NAME_MAX_LENGTH} caracteres.`,
+			});
+			hasError = true;
+		}
+
+		const normalizedNumbers = validateTicketNumbers(raw?.numbers);
 		if (!normalizedNumbers) {
 			invalidTickets.push({
 				index,
 				rawId,
+				field: "numbers",
 				reason: `Debe tener ${TICKET_NUMBERS_PER_CARD} numeros unicos entre ${BINGO_MIN} y ${BINGO_MAX}.`,
 			});
+			hasError = true;
+		}
+
+		if (!ticketId || !normalizedNumbers || hasError) {
 			return;
 		}
 
 		usedIds.add(ticketId);
 		tickets.push({
 			id: ticketId,
-			name: normalizeTicketName(raw?.name),
+			name: trimmedName.length > 0 ? trimmedName : undefined,
 			numbers: normalizedNumbers,
 		});
 	});

@@ -2,10 +2,12 @@
 
 Esta carpeta sirve para documentar decisiones, flujos y tareas tecnicas del sistema de control de bingo.
 
-## Archivos iniciales
+## Archivos
 
 - `01-creacion-archivos.md`: checklist para nuevos archivos
-- `02-logica-bingo.md`: reglas y flujo de la logica de juego
+- `02-logica-bingo.md`: reglas y flujo de la logica de juego (control + cartones)
+- `03-abm-seguridad.md`: reglas de ABM de cartones, autenticacion, seguridad y convenciones de la UI de Gestion
+- `04-despliegue-cloudflare.md`: runbook para desplegar/redesplegar en Cloudflare (Worker + D1)
 
 ## Sugerencia de uso
 
