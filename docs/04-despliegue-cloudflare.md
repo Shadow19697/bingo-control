@@ -12,6 +12,12 @@ cambia la interfaz ni los endpoints, solo los pone en produccion.
 - `public/tickets.json`: cartones historicos, solo se usan para el seed inicial (local o de
   produccion la primera vez).
 
+El binding `ASSETS` (`wrangler.jsonc`, `env.ASSETS` en `worker/index.ts`) es lo que permite al Worker
+delegar a `dist/index.html` cualquier ruta que no empiece con `/api/` — asi el `not_found_handling:
+"single-page-application"` declarado en `wrangler.jsonc` se cumple de verdad. El frontend hoy no usa
+routing por URL (los tabs se manejan por JS/CSS, la URL siempre es `/`), pero el binding evita que una
+ruta no reconocida devuelva un 404 JSON en vez de la app.
+
 ## API implementada
 
 - `GET /api/auth/session`

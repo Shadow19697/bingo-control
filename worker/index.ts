@@ -1,5 +1,6 @@
 export type Env = {
 	DB: D1Database;
+	ASSETS: Fetcher;
 	SESSION_SECRET: string;
 	ADMIN_USERNAME: string;
 	ADMIN_PASSWORD: string;
@@ -442,6 +443,10 @@ export default {
 			return handleTickets(request, env);
 		}
 
-		return errorResponse("Ruta API no encontrada.", 404);
+		if (url.pathname.startsWith("/api/")) {
+			return errorResponse("Ruta API no encontrada.", 404);
+		}
+
+		return env.ASSETS.fetch(request);
 	},
 };
