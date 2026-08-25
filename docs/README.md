@@ -8,6 +8,7 @@ Esta carpeta sirve para documentar decisiones, flujos y tareas tecnicas del sist
 - `02-logica-bingo.md`: reglas y flujo de la logica de juego (control + cartones)
 - `03-abm-seguridad.md`: reglas de ABM de cartones, autenticacion, seguridad y convenciones de la UI de Gestion
 - `04-despliegue-cloudflare.md`: runbook para desplegar/redesplegar en Cloudflare (Worker + D1)
+- `05-tema-claro-oscuro.md`: sistema de tokens de color, tema claro/oscuro y reglas al tocar estilos
 
 ## Sugerencia de uso
 

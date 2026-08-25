@@ -73,6 +73,11 @@ post-deploy): `docs/04-despliegue-cloudflare.md`.
 8. En **Gestion**, alta individual y carga masiva se hacen en modales (icono-only en mobile);
    guardar con exito cierra el modal y muestra un toast; carga masiva suma cartones nuevos a los
    existentes, no reemplaza. Detalle completo de reglas y UI: `docs/03-abm-seguridad.md`.
+9. **Gestion** muestra ademas un contador de cartones cargados y un buscador que filtra la tabla
+   por coincidencia de ID o nombre (ignora mayusculas y acentos). El filtro es local, no consulta
+   la API, y se conserva al editar o borrar.
+10. El boton de sol/luna del encabezado alterna entre modo claro y oscuro. La primera visita sigue
+    la preferencia del sistema; una vez elegido, queda guardado en `localStorage`.
 
 ## Formato de cartones JSON
 
@@ -96,3 +101,7 @@ Reglas por carton (mismas reglas que valida la app en alta individual y carga ma
 - `id` entero positivo y unico (acepta ceros a la izquierda, se normaliza sin ellos).
 - `name` opcional, hasta 60 caracteres.
 - `numbers` con exactamente 15 enteros entre 1 y 90, sin repetidos.
+
+En el alta individual el campo de numeros acepta coma, espacio, salto de linea, punto y coma o
+punto como separador, para que funcione con la tecla de separador que ofrezca cada teclado de
+celular. El formato de la carga masiva CSV no cambia: sigue usando la coma como separador de celdas.

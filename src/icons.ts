@@ -1,7 +1,7 @@
 import { icon, library } from "@fortawesome/fontawesome-svg-core";
-import { faFileImport, faPenToSquare, faRightFromBracket, faRightToBracket, faSquarePlus, faTrash, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faFileImport, faMagnifyingGlass, faMoon, faPenToSquare, faRightFromBracket, faRightToBracket, faSquarePlus, faSun, faTrash, faXmark } from "@fortawesome/free-solid-svg-icons";
 
-library.add(faRightToBracket, faRightFromBracket, faXmark, faPenToSquare, faTrash, faSquarePlus, faFileImport);
+library.add(faRightToBracket, faRightFromBracket, faXmark, faPenToSquare, faTrash, faSquarePlus, faFileImport, faMagnifyingGlass, faSun, faMoon);
 
 export const authIcons = {
 	login: icon(faRightToBracket).html.join(""),
@@ -14,4 +14,11 @@ export const actionIcons = {
 	delete: icon(faTrash).html.join(""),
 	addOne: icon(faSquarePlus).html.join(""),
 	addMany: icon(faFileImport).html.join(""),
+	search: icon(faMagnifyingGlass).html.join(""),
+};
+
+// El icono representa el tema al que se cambia al tocar el boton, no el tema actual.
+export const themeIcons = {
+	light: icon(faSun).html.join(""),
+	dark: icon(faMoon).html.join(""),
 };

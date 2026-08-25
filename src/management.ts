@@ -53,9 +53,12 @@ function parseRawPayload(input: string): unknown {
 	return parseCsvPayload(trimmed);
 }
 
+// Los valores validos son enteros de 1 a 90, asi que ningun separador puede formar parte de un
+// numero. Aceptamos coma, espacio, salto de linea, punto y coma o punto para que el campo funcione
+// con cualquier tecla de separador que ofrezca el teclado numerico del celular.
 export function parseTicketNumbersInput(input: string): number[] {
 	const values = input
-		.split(",")
+		.split(/[\s,;.]+/)
 		.map((entry) => entry.trim())
 		.filter((entry) => entry.length > 0)
 		.map((entry) => Number(entry));

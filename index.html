@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Control de Bingo</title>
+    <script>
+      // Resuelve el tema antes del primer paint para evitar el parpadeo de claro a oscuro.
+      // La logica de cambio y persistencia vive en src/main.ts (THEME_STORAGE_KEY).
+      (function () {
+        try {
+          var saved = localStorage.getItem("bingo-theme");
+          var dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

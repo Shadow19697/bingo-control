@@ -2,7 +2,7 @@ import "./style.css";
 import { ApiError, createTicket, deleteAllTickets, deleteTicket, fetchTicketsFromApi, getSession, importTickets, login, logout, updateTicket } from "./api";
 import { clearCalledNumbers, getTotalBingoNumbers, toggleCalledNumber } from "./bingo";
 import { BINGO_MAX, BINGO_MIN, isValidBingoNumber } from "./config";
-import { actionIcons, authIcons } from "./icons";
+import { actionIcons, authIcons, themeIcons } from "./icons";
 import { parseBulkTicketsInput, parseTicketNumbersInput } from "./management";
 import { countTicketHits, parseTicketsPayload, sortTicketsById, type InvalidTicket, type Ticket } from "./tickets";
 import { querySelectorOrThrow } from "./ui/dom";
@@ -13,6 +13,7 @@ import { renderTicketsTable, reorderTicketRows, resetTicketMatrixState, setTicke
 
 type SortMode = "hits" | "fixed";
 type ActiveTab = "control" | "tickets" | "management";
+type Theme = "light" | "dark";
 
 const app = querySelectorOrThrow<HTMLDivElement>("#app");
 const calledNumbers = new Set<number>();
@@ -29,6 +30,7 @@ let ticketHits: number[] = [];
 let ticketIndexByNumber = new Map<number, number[]>();
 let sortMode: SortMode = "hits";
 let isAuthenticated = false;
+let managementSearchTerm = "";
 
 app.innerHTML = getAppTemplate(totalNumbers);
 
@@ -46,6 +48,8 @@ const clearBtn = querySelectorOrThrow<HTMLButtonElement>("#clear-btn", app);
 const manualBtn = querySelectorOrThrow<HTMLButtonElement>("#manual-btn", app);
 const manualInput = querySelectorOrThrow<HTMLInputElement>("#manual-number", app);
 const helpTip = querySelectorOrThrow<HTMLElement>("#help-tip", app);
+const themeToggleBtn = querySelectorOrThrow<HTMLButtonElement>("#theme-toggle-btn", app);
+const themeToggleIcon = querySelectorOrThrow<HTMLElement>("#theme-toggle-icon", app);
 const authOpenBtn = querySelectorOrThrow<HTMLButtonElement>("#auth-open-btn", app);
 const authOpenIcon = querySelectorOrThrow<HTMLElement>("#auth-open-icon", app);
 const authModal = querySelectorOrThrow<HTMLElement>("#auth-modal", app);
@@ -87,6 +91,9 @@ const ticketFormError = querySelectorOrThrow<HTMLElement>("#ticket-form-error", 
 const ticketClearFormBtn = querySelectorOrThrow<HTMLButtonElement>("#ticket-clear-form-btn", app);
 const toast = querySelectorOrThrow<HTMLElement>("#toast", app);
 const managementTicketsBody = querySelectorOrThrow<HTMLTableSectionElement>("#management-tickets-body", app);
+const managementCount = querySelectorOrThrow<HTMLElement>("#management-count", app);
+const managementSearchInput = querySelectorOrThrow<HTMLInputElement>("#management-search", app);
+const managementSearchClearBtn = querySelectorOrThrow<HTMLButtonElement>("#management-search-clear", app);
 const bulkModal = querySelectorOrThrow<HTMLElement>("#bulk-modal", app);
 const bulkModalBackdrop = querySelectorOrThrow<HTMLButtonElement>("#bulk-modal-backdrop", app);
 const bulkModalCloseBtn = querySelectorOrThrow<HTMLButtonElement>("#bulk-modal-close-btn", app);
@@ -343,11 +350,57 @@ const setAuthUi = (nextAuth: boolean): void => {
 	}
 };
 
+// Marcas diacriticas combinantes (U+0300 a U+036F): se quitan para que "jose" matchee "José".
+const DIACRITICS_PATTERN = new RegExp("[\\u0300-\\u036f]", "g");
+
+const normalizeSearchText = (value: string): string =>
+	value
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(DIACRITICS_PATTERN, "");
+
+const matchesManagementSearch = (ticket: Ticket, term: string): boolean =>
+	normalizeSearchText(ticket.id).includes(term) || normalizeSearchText(ticket.name ?? "").includes(term);
+
+// Va pegado al titulo "Cartones actuales", asi que el numero solo ya se entiende.
+const renderManagementCount = (visibleCount: number): void => {
+	managementCount.textContent = managementSearchTerm.length > 0 ? `${visibleCount} de ${tickets.length}` : String(tickets.length);
+};
+
+const clearManagementSearch = (): void => {
+	managementSearchTerm = "";
+	managementSearchInput.value = "";
+	managementSearchClearBtn.hidden = true;
+};
+
+const createManagementEmptyRow = (): HTMLTableRowElement => {
+	const row = document.createElement("tr");
+	const cell = document.createElement("td");
+	cell.colSpan = 4;
+	cell.className = "management-empty";
+	cell.textContent =
+		managementSearchTerm.length > 0
+			? `Sin resultados para "${managementSearchInput.value.trim()}".`
+			: "No hay cartones cargados.";
+	row.appendChild(cell);
+
+	return row;
+};
+
 const renderManagementRows = (): void => {
 	managementTicketsBody.innerHTML = "";
 	const fragment = document.createDocumentFragment();
+	const visibleTickets =
+		managementSearchTerm.length > 0 ? tickets.filter((ticket) => matchesManagementSearch(ticket, managementSearchTerm)) : tickets;
 
-	tickets.forEach((ticket) => {
+	renderManagementCount(visibleTickets.length);
+
+	if (visibleTickets.length === 0) {
+		managementTicketsBody.appendChild(createManagementEmptyRow());
+		return;
+	}
+
+	visibleTickets.forEach((ticket) => {
 		const row = document.createElement("tr");
 
 		const idCell = document.createElement("td");
@@ -510,6 +563,49 @@ const renderTicketLoadStatus = (invalidRows: string[]): void => {
 };
 
 const SESSION_EXPIRED_STORAGE_KEY = "bingo-session-expired";
+const THEME_STORAGE_KEY = "bingo-theme";
+
+// El tema inicial ya lo resuelve el script inline de index.html, antes del primer paint.
+const getCurrentTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+
+const readStoredTheme = (): Theme | null => {
+	try {
+		const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+		return stored === "dark" || stored === "light" ? stored : null;
+	} catch {
+		return null;
+	}
+};
+
+const applyTheme = (theme: Theme, persist: boolean): void => {
+	const isDark = theme === "dark";
+	document.documentElement.dataset.theme = theme;
+	themeToggleIcon.innerHTML = isDark ? themeIcons.light : themeIcons.dark;
+	themeToggleBtn.setAttribute("aria-label", isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
+	themeToggleBtn.title = isDark ? "Modo claro" : "Modo oscuro";
+
+	if (!persist) {
+		return;
+	}
+
+	try {
+		window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+	} catch {
+		// Modo privado o storage bloqueado: el tema vale para esta sesion y no se persiste.
+	}
+};
+
+const initializeTheme = (): void => {
+	applyTheme(getCurrentTheme(), false);
+
+	const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+	darkQuery.addEventListener("change", (event) => {
+		// Solo seguimos al sistema mientras el usuario no haya elegido explicitamente.
+		if (readStoredTheme() === null) {
+			applyTheme(event.matches ? "dark" : "light", false);
+		}
+	});
+};
 
 const handleUnauthorized = (error: unknown): boolean => {
 	if (error instanceof ApiError && error.status === 401) {
@@ -646,6 +742,7 @@ const handleLogout = async (): Promise<void> => {
 	} finally {
 		setAuthUi(false);
 		tickets = [];
+		clearManagementSearch();
 		ticketTableView = renderTicketsTable(ticketsBody, tickets);
 		renderManagementRows();
 		renderTicketLoadStatus([]);
@@ -659,6 +756,22 @@ authOpenBtn.addEventListener("click", () => {
 	}
 
 	openAuthModal();
+});
+
+managementSearchInput.addEventListener("input", () => {
+	managementSearchTerm = normalizeSearchText(managementSearchInput.value.trim());
+	managementSearchClearBtn.hidden = managementSearchInput.value.length === 0;
+	renderManagementRows();
+});
+
+managementSearchClearBtn.addEventListener("click", () => {
+	clearManagementSearch();
+	renderManagementRows();
+	managementSearchInput.focus();
+});
+
+themeToggleBtn.addEventListener("click", () => {
+	applyTheme(getCurrentTheme() === "dark" ? "light" : "dark", true);
 });
 
 authCloseBtn.addEventListener("click", () => {
@@ -861,7 +974,9 @@ deleteAllBtn.addEventListener("click", async () => {
 
 checkSessionExpiredNotice();
 void initializeSession();
+initializeTheme();
 updateSortButtons();
 refreshStatus();
 updateHelpTip("control");
 setProtectedTabsVisibility(false);
+renderManagementRows();

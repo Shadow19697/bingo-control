@@ -1,5 +1,5 @@
 import { BINGO_MAX, BINGO_MIN } from "../config";
-import { actionIcons, authIcons } from "../icons";
+import { actionIcons, authIcons, themeIcons } from "../icons";
 import { version } from "../../package.json";
 
 export function getAppTemplate(totalNumbers: number): string {
@@ -19,9 +19,14 @@ export function getAppTemplate(totalNumbers: number): string {
           Toca un numero para marcarlo o desmarcarlo. Tambien puedes cargarlo manualmente y limpiar
           la partida cuando quieras.
         </div>
-        <button id="auth-open-btn" class="auth-open-btn icon-btn" type="button" aria-label="Abrir ingreso" title="Ingreso">
-          <span id="auth-open-icon" aria-hidden="true">${authIcons.login}</span>
-        </button>
+        <div class="hero-actions">
+          <button id="theme-toggle-btn" class="hero-icon-btn icon-btn" type="button" aria-label="Cambiar a modo oscuro" title="Modo oscuro">
+            <span id="theme-toggle-icon" aria-hidden="true">${themeIcons.dark}</span>
+          </button>
+          <button id="auth-open-btn" class="auth-open-btn hero-icon-btn icon-btn" type="button" aria-label="Abrir ingreso" title="Ingreso">
+            <span id="auth-open-icon" aria-hidden="true">${authIcons.login}</span>
+          </button>
+        </div>
         <span class="app-version">v${version}</span>
       </header>
 
@@ -69,8 +74,8 @@ export function getAppTemplate(totalNumbers: number): string {
                 <input id="ticket-name-input" name="ticketName" type="text" maxlength="60" />
               </label>
               <label class="ticket-form-full">
-                <span>Numeros (15 valores, separados por coma)</span>
-                <input id="ticket-numbers-input" name="ticketNumbers" type="text" placeholder="1, 4, 7, 12, ..." required />
+                <span>Numeros (15 valores, separados por coma o espacio)</span>
+                <input id="ticket-numbers-input" name="ticketNumbers" type="text" inputmode="decimal" placeholder="1, 4, 7, 12, ..." required />
               </label>
             </div>
             <div class="ticket-form-actions">
@@ -210,6 +215,7 @@ export function getAppTemplate(totalNumbers: number): string {
           <section class="ticket-list-wrap" aria-label="Cartones actuales para editar o borrar">
             <div class="ticket-list-head">
               <h2>Cartones actuales</h2>
+              <span id="management-count" class="mgmt-count" aria-live="polite" aria-label="Cartones cargados">0</span>
               <div class="ticket-list-actions">
                 <button id="open-ticket-modal-btn" class="btn alt" type="button" aria-label="Cargar carton" title="Cargar carton">
                   <span class="btn-icon" aria-hidden="true">${actionIcons.addOne}</span>
@@ -224,6 +230,11 @@ export function getAppTemplate(totalNumbers: number): string {
                   <span class="btn-label">Borrar todos</span>
                 </button>
               </div>
+            </div>
+            <div class="management-search">
+              <span class="management-search-icon" aria-hidden="true">${actionIcons.search}</span>
+              <input id="management-search" type="search" autocomplete="off" placeholder="Buscar por ID o nombre" aria-label="Buscar cartones por ID o nombre" />
+              <button id="management-search-clear" class="management-search-clear" type="button" aria-label="Limpiar busqueda" title="Limpiar busqueda" hidden>${authIcons.close}</button>
             </div>
             <div class="management-table-scroll">
               <table class="management-table">

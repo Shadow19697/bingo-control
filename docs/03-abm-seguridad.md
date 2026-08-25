@@ -43,6 +43,12 @@ Compartidas por la carga individual y la carga masiva a traves de una sola funci
   puntuacion.
 - **Numeros**: exactamente 15, enteros entre 1 y 90, sin repetidos entre si. No hace falta orden
   ascendente al ingresarlos (se normalizan y ordenan al guardar). `"01"` se toma como `1`.
+  En el alta individual, `parseTicketNumbersInput` (`src/management.ts`) separa por coma, espacio,
+  salto de linea, punto y coma o punto: como los valores validos son enteros de 1 a 90, ningun
+  separador puede formar parte de un numero. Esto es lo que permite que el campo use
+  `inputmode="decimal"` y funcione con cualquier tecla de separador del teclado numerico del
+  celular. El parser de CSV de la carga masiva **no** comparte esta logica: ahi la coma sigue
+  siendo el separador de celdas.
 - Un cartón puede fallar por **mas de un motivo a la vez** (por ejemplo, ID ya usado y numeros
   invalidos simultaneamente): la validacion no corta en el primer error, acumula todos los que
   encuentra para ese cartón y los muestra juntos — tanto en el modal individual
@@ -88,6 +94,17 @@ mismo click — no hay un paso intermedio de vista previa/confirmacion.
   columnas x 3 filas (`.mgmt-numbers-grid`) en vez de una lista separada por comas — evita el
   scroll horizontal en 375-412px de ancho. Desktop no cambia (sigue mostrando los numeros como
   texto).
+- El encabezado de "Cartones actuales" muestra un contador (`#management-count`): sin filtro es
+  solo el numero (`15`), porque va pegado al titulo y no necesita repetir la palabra; con filtro
+  activo pasa a `N de Total`. Lleva `aria-label` para que el numero suelto tenga contexto al leerlo. Debajo hay un buscador (`#management-search`) que
+  filtra por coincidencia de ID o nombre, ignorando mayusculas y acentos (`normalizeSearchText` en
+  `src/main.ts`). El filtro es **local** sobre el array `tickets` ya cargado: no vuelve a consultar
+  la API. Como `renderManagementRows` se re-ejecuta entero en cada `reloadTicketsAndViews()`, el
+  termino de busqueda vive en el modulo (`managementSearchTerm`) y no en el DOM, para que sobreviva
+  al refetch posterior a editar o borrar un carton. Se limpia al cerrar sesion.
+- Cuando no hay filas para mostrar, la tabla renderiza una unica fila con `colspan=4`
+  (`.management-empty`): "Sin resultados para ..." si hay busqueda activa, o "No hay cartones
+  cargados." si la base esta vacia.
 - Los botones de accion de cada fila **no** deben ir directo sobre un `<td>` con `display: flex`
   — genera una celda anonima de tabla y con `table-layout: fixed` el ancho declarado deja de
   aplicarse a la celda real (ver el fix en `renderManagementRows`, `src/main.ts`): el flex tiene
