@@ -119,6 +119,20 @@ function toCookie(token: string, ttlMinutes: number): string {
 	return `${SESSION_COOKIE_NAME}=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
+function getSessionTtlMinutes(env: Env): number {
+	const parsed = Number(env.SESSION_TTL_MINUTES ?? "30");
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+}
+
+// La sesion expira por inactividad, no en un plazo fijo desde el login: toda request autenticada
+// re-emite la cookie con un `exp` nuevo. Solo se llama cuando ya se valido la sesion.
+async function withRefreshedSession(response: Response, username: string, env: Env): Promise<Response> {
+	const ttl = getSessionTtlMinutes(env);
+	const token = await createSessionToken(username, ttl, env.SESSION_SECRET);
+	response.headers.append("set-cookie", toCookie(token, ttl));
+	return response;
+}
+
 function clearCookie(): string {
 	return `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
@@ -284,14 +298,15 @@ async function upsertTicket(env: Env, previousId: string | null, ticket: Ticket,
 
 async function handleAuth(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
-	const ttl = Number(env.SESSION_TTL_MINUTES ?? "30");
+	const ttl = getSessionTtlMinutes(env);
 
 	if (request.method === "GET" && url.pathname === "/api/auth/session") {
 		const session = await requireSession(request, env);
 		if (!session) {
 			return jsonResponse({ authenticated: false });
 		}
-		return jsonResponse({ authenticated: true, username: session.u });
+		// El cliente usa este endpoint tambien como keepalive de actividad, asi que renueva la cookie.
+		return withRefreshedSession(jsonResponse({ authenticated: true, username: session.u, ttlMinutes: ttl }), session.u, env);
 	}
 
 	if (request.method === "POST" && url.pathname === "/api/auth/login") {
@@ -317,7 +332,7 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
 		}
 
 		const token = await createSessionToken(username, ttl, env.SESSION_SECRET);
-		const response = jsonResponse({ authenticated: true, username });
+		const response = jsonResponse({ authenticated: true, username, ttlMinutes: ttl });
 		response.headers.append("set-cookie", toCookie(token, ttl));
 		return response;
 	}
@@ -332,12 +347,19 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
 }
 
 async function handleTickets(request: Request, env: Env): Promise<Response> {
-	const url = new URL(request.url);
 	const session = await requireSession(request, env);
 
 	if (!session) {
 		return errorResponse("No autenticado.", 401);
 	}
+
+	// Se renueva incluso ante 400/404/409: una request autenticada es actividad aunque el payload
+	// sea invalido. El 401 sale antes y por eso nunca emite cookie.
+	return withRefreshedSession(await routeTickets(request, env, session), session.u, env);
+}
+
+async function routeTickets(request: Request, env: Env, session: SessionPayload): Promise<Response> {
+	const url = new URL(request.url);
 
 	if (request.method === "GET" && url.pathname === "/api/tickets") {
 		const tickets = await getTickets(env);

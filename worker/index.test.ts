@@ -21,6 +21,15 @@ function makeTicket(id: string, numbers: number[] = VALID_NUMBERS) {
 	return { id, name: "Mesa test", numbers };
 }
 
+// El token no es un JWT: es base64url(payload) + "." + firma HMAC (ver createSessionToken).
+function readTokenExp(cookieValue: string): number {
+	const token = cookieValue.replace(/^bingo_session=/, "").split(";")[0];
+	const encodedPayload = token.split(".")[0];
+	const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+	const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+	return (JSON.parse(atob(normalized + padding)) as { exp: number }).exp;
+}
+
 async function loginCookie(): Promise<string> {
 	const response = await worker.fetch(
 		makeRequest("/api/auth/login", {
@@ -47,7 +56,7 @@ describe("auth", () => {
 	it("login correcto entrega cookie y sesion valida", async () => {
 		const cookie = await loginCookie();
 		const response = await worker.fetch(makeRequest("/api/auth/session", { cookie }), TEST_ENV);
-		expect(await response.json()).toEqual({ authenticated: true, username: "admin" });
+		expect(await response.json()).toEqual({ authenticated: true, username: "admin", ttlMinutes: 30 });
 	});
 
 	it("login con contrasena incorrecta responde 401", async () => {
@@ -105,6 +114,36 @@ describe("auth", () => {
 		const response = await worker.fetch(makeRequest("/api/auth/logout", { method: "POST", body: "{}" }), TEST_ENV);
 		const setCookie = response.headers.get("set-cookie");
 		expect(setCookie).toContain("Max-Age=0");
+	});
+
+	it("una request autenticada renueva la sesion con el TTL completo, no con el remanente", async () => {
+		// Token al que le queda 1 minuto: si la renovacion arrastrara el remanente, el exp nuevo
+		// quedaria pegado al viejo en vez de saltar a los 30 minutos configurados.
+		const almostExpiredToken = await createSessionToken("admin", 1, "test-secret-key-for-vitest");
+		const previousExp = readTokenExp(almostExpiredToken);
+
+		const response = await worker.fetch(makeRequest("/api/tickets", { cookie: `bingo_session=${almostExpiredToken}` }), TEST_ENV);
+		expect(response.status).toBe(200);
+
+		const setCookie = response.headers.get("set-cookie");
+		expect(setCookie).toContain("Max-Age=1800");
+		expect(readTokenExp(setCookie!) - previousExp).toBeGreaterThan(25 * 60_000);
+	});
+
+	it("una request sin sesion no renueva la cookie", async () => {
+		const response = await worker.fetch(makeRequest("/api/tickets"), TEST_ENV);
+		expect(response.status).toBe(401);
+		expect(response.headers.get("set-cookie")).toBeNull();
+	});
+
+	it("GET /api/auth/session renueva la cookie solo cuando hay sesion valida", async () => {
+		const cookie = await loginCookie();
+		const authenticated = await worker.fetch(makeRequest("/api/auth/session", { cookie }), TEST_ENV);
+		expect(authenticated.headers.get("set-cookie")).toContain("bingo_session=");
+
+		const expiredToken = await createSessionToken("admin", -1, "test-secret-key-for-vitest");
+		const anonymous = await worker.fetch(makeRequest("/api/auth/session", { cookie: `bingo_session=${expiredToken}` }), TEST_ENV);
+		expect(anonymous.headers.get("set-cookie")).toBeNull();
 	});
 });
 

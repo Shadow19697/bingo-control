@@ -7,19 +7,19 @@
 		{
 			"binding": "DB",
 			"database_name": "bingo_control_db",
-			"database_id": "43830621-446c-4637-a545-8fd108357448"
-		}
+			"database_id": "43830621-446c-4637-a545-8fd108357448",
+		},
 	],
 	"vars": {
 		"SESSION_TTL_MINUTES": "30",
-		"ADMIN_USERNAME": "admin"
+		"ADMIN_USERNAME": "admin",
 	},
 	"assets": {
 		"directory": "./dist",
 		"not_found_handling": "single-page-application",
-		"binding": "ASSETS"
+		"binding": "ASSETS",
 	},
 	"observability": {
-		"enabled": true
-	}
+		"enabled": true,
+	},
 }

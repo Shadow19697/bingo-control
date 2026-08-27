@@ -347,6 +347,7 @@ const setAuthUi = (nextAuth: boolean): void => {
 	if (!nextAuth) {
 		updateTabs("control");
 		closeAuthModal();
+		cancelIdleExpiry();
 	}
 };
 
@@ -607,14 +608,98 @@ const initializeTheme = (): void => {
 	});
 };
 
+const forceSessionExpired = (): void => {
+	window.sessionStorage.setItem(SESSION_EXPIRED_STORAGE_KEY, "1");
+	window.location.reload();
+};
+
 const handleUnauthorized = (error: unknown): boolean => {
 	if (error instanceof ApiError && error.status === 401) {
-		window.sessionStorage.setItem(SESSION_EXPIRED_STORAGE_KEY, "1");
-		window.location.reload();
+		forceSessionExpired();
 		return true;
 	}
 
 	return false;
+};
+
+// La sesion vive por inactividad (el Worker renueva la cookie en cada request autenticada), pero
+// llenar el formulario de un carton no genera requests. Este ping convierte la interaccion real del
+// usuario en actividad para el servidor.
+const SESSION_KEEPALIVE_THROTTLE_MS = 5 * 60_000;
+let lastSessionTouchAt = 0;
+let sessionTouchInFlight = false;
+
+// Ademas del ping, un timer local dispara el cierre por su cuenta al vencer la inactividad, sin
+// esperar a que el usuario vuelva a tocar la pantalla: evita dejar cartones (datos sensibles) visibles
+// en una pantalla desatendida. El ping sigue siendo el respaldo que confirma contra el servidor.
+const DEFAULT_SESSION_TTL_MINUTES = 30;
+let sessionTtlMinutes = DEFAULT_SESSION_TTL_MINUTES;
+let idleTimeoutId: number | undefined;
+
+const scheduleIdleExpiry = (): void => {
+	if (idleTimeoutId) {
+		window.clearTimeout(idleTimeoutId);
+	}
+	idleTimeoutId = window.setTimeout(forceSessionExpired, sessionTtlMinutes * 60_000);
+};
+
+const cancelIdleExpiry = (): void => {
+	if (idleTimeoutId) {
+		window.clearTimeout(idleTimeoutId);
+		idleTimeoutId = undefined;
+	}
+};
+
+const touchSession = (): void => {
+	if (!isAuthenticated || sessionTouchInFlight) {
+		return;
+	}
+
+	const now = Date.now();
+	if (now - lastSessionTouchAt < SESSION_KEEPALIVE_THROTTLE_MS) {
+		return;
+	}
+
+	sessionTouchInFlight = true;
+	lastSessionTouchAt = now;
+
+	void getSession()
+		.then((session) => {
+			// El servidor responde 200 con authenticated:false cuando la cookie ya vencio, no 401.
+			if (!session.authenticated) {
+				forceSessionExpired();
+			}
+		})
+		.catch(() => {
+			// Sin red no cerramos sesion: se reintenta en la proxima interaccion pasado el throttle.
+		})
+		.finally(() => {
+			sessionTouchInFlight = false;
+		});
+};
+
+const onUserActivity = (): void => {
+	// El timer local mide "tiempo desde la ultima interaccion" sin el throttle del ping, para que el
+	// cierre proactivo no se corra por eso.
+	if (isAuthenticated) {
+		scheduleIdleExpiry();
+	}
+	touchSession();
+};
+
+const initializeSessionKeepalive = (): void => {
+	// Solo interaccion intencional: un mousemove (o un mouse que se mueve solo) no deberia mantener
+	// viva la sesion. `capture` para que dispare aunque un handler corte la propagacion.
+	const options: AddEventListenerOptions = { passive: true, capture: true };
+	document.addEventListener("pointerdown", onUserActivity, options);
+	document.addEventListener("keydown", onUserActivity, options);
+	document.addEventListener("visibilitychange", () => {
+		// Al volver a la pestaña conviene detectar el vencimiento antes de que el usuario tipee un
+		// carton entero y lo pierda en el reload del Guardar.
+		if (document.visibilityState === "visible") {
+			onUserActivity();
+		}
+	});
 };
 
 const checkSessionExpiredNotice = (): void => {
@@ -653,6 +738,9 @@ const reloadTicketsAndViews = async (): Promise<void> => {
 		syncTicketNumberHighlights();
 		renderManagementRows();
 		renderTicketLoadStatus([]);
+		// Esta request ya renovo la cookie del lado del servidor: no hace falta un ping ademas.
+		lastSessionTouchAt = Date.now();
+		scheduleIdleExpiry();
 	} catch (error) {
 		handleError(error, "No se pudo cargar cartones desde la API.");
 	}
@@ -667,6 +755,7 @@ const initializeSession = async (): Promise<void> => {
 			return;
 		}
 
+		sessionTtlMinutes = session.ttlMinutes ?? DEFAULT_SESSION_TTL_MINUTES;
 		setAuthUi(true);
 		await reloadTicketsAndViews();
 	} catch {
@@ -722,7 +811,8 @@ authForm.addEventListener("submit", async (event) => {
 	authLoginBtn.disabled = true;
 
 	try {
-		await login({ username, password });
+		const session = await login({ username, password });
+		sessionTtlMinutes = session.ttlMinutes ?? DEFAULT_SESSION_TTL_MINUTES;
 		setAuthUi(true);
 		authUserInput.value = "";
 		authPassInput.value = "";
@@ -974,6 +1064,7 @@ deleteAllBtn.addEventListener("click", async () => {
 
 checkSessionExpiredNotice();
 void initializeSession();
+initializeSessionKeepalive();
 initializeTheme();
 updateSortButtons();
 refreshStatus();

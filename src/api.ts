@@ -13,6 +13,7 @@ export class ApiError extends Error {
 type SessionPayload = {
 	authenticated: boolean;
 	username?: string;
+	ttlMinutes?: number;
 };
 
 type TicketPayload = {

@@ -8,9 +8,22 @@ pestaña Gestion, y que reglas hay que mantener si se toca este codigo.
 - Un unico usuario administrador (`ADMIN_USERNAME`, por defecto `admin`) con clave en
   `ADMIN_PASSWORD`. Multiusuario no esta implementado.
 - El login (`POST /api/auth/login`) entrega una cookie de sesion firmada
-  (`HttpOnly`, `Secure`, `SameSite=Strict`), valida por `SESSION_TTL_MINUTES` (por defecto 30).
-- `GET /api/auth/session` informa `{ authenticated, username? }`; el frontend lo usa al iniciar
-  (`initializeSession` en `src/main.ts`) para decidir si mostrar el estado logueado.
+  (`HttpOnly`, `Secure`, `SameSite=Strict`).
+- La sesion caduca por **inactividad**, no en un plazo fijo desde el login: `SESSION_TTL_MINUTES`
+  (por defecto 30) es la ventana de inactividad tolerada. Toda request autenticada re-emite la cookie
+  con un `exp` nuevo y el TTL completo (`withRefreshedSession` en `worker/index.ts`, aplicado en
+  `handleTickets` y en la rama autenticada de `GET /api/auth/session`). Un `401` sale antes del
+  wrapper, asi que nunca renueva. No hay tope maximo absoluto de duracion.
+- `GET /api/auth/session` y el login exitoso informan `{ authenticated, username?, ttlMinutes? }`
+  (`ttlMinutes` no es informacion sensible: ya esta documentada en
+  `docs/04-despliegue-cloudflare.md`, y el frontend la guarda en `sessionTtlMinutes` para programar el
+  cierre proactivo, ver mas abajo). El frontend usa el endpoint al iniciar
+  (`initializeSession` en `src/main.ts`) para decidir si mostrar el estado logueado, y tambien como
+  **keepalive**: llenar el formulario de un carton no genera ninguna request, asi que
+  `initializeSessionKeepalive` (`src/main.ts`) escucha `pointerdown`/`keydown`/`visibilitychange` y
+  pinguea el endpoint como maximo una vez cada 5 minutos (`SESSION_KEEPALIVE_THROTTLE_MS`). Se
+  descarta `mousemove` a proposito: solo cuenta la interaccion intencional. La ventana efectiva de
+  inactividad queda entonces entre 25 y 30 minutos. Un fallo de red en el ping **no** cierra sesion.
 - Las pestañas **Cartones** y **Gestion** quedan ocultas sin sesion valida.
 - Rate limiting de login: **5 intentos fallidos cada 15 minutos por IP** (tabla `login_attempts`,
   `worker/index.ts`); al superarlo, `429`. Un `401` en login es credencial incorrecta; un `404`
@@ -19,11 +32,27 @@ pestaña Gestion, y que reglas hay que mantener si se toca este codigo.
 
 ### Sesion vencida durante el uso
 
-Cualquier accion protegida de cartones que responda `401` (sesion vencida o invalidada del lado del
-servidor) fuerza un `window.location.reload()` desde el cliente (`handleUnauthorized` en
-`src/main.ts`) — no se intenta manejar el estado "a medias". Como el reload borra la memoria de JS,
-el aviso de "por que se recargo" se guarda antes en `sessionStorage` y se muestra como un toast rojo
-apenas termina de cargar la pagina (`checkSessionExpiredNotice`).
+Hay dos vias de deteccion, y las dos terminan en el mismo lugar (`forceSessionExpired` en
+`src/main.ts`): guardar el motivo en `sessionStorage` y forzar un `window.location.reload()` — no se
+intenta manejar el estado "a medias". Como el reload borra la memoria de JS, el aviso de "por que se
+recargo" se lee despues del boot y se muestra como un toast rojo (`checkSessionExpiredNotice`).
+
+1. **`401` en una accion protegida** de cartones (`handleUnauthorized`).
+2. **El ping de keepalive** recibe `authenticated: false`. Ojo: el endpoint de sesion responde `200`
+   con ese campo en `false` cuando la cookie vencio, **no** un `401`, asi que ahi la deteccion va por
+   el campo y no por `ApiError`. Al volver a una pestaña que estuvo inactiva, el ping de
+   `visibilitychange` corta la sesion antes de que el usuario tipee un carton entero y lo pierda en
+   el reload del Guardar.
+3. **El timer local de inactividad** (`scheduleIdleExpiry`/`cancelIdleExpiry` en `src/main.ts`). A
+   diferencia de las otras dos vias, esta no espera ninguna interaccion: cada `pointerdown`/`keydown`/
+   vuelta a la pestaña (`onUserActivity`) reprograma un `setTimeout` a `sessionTtlMinutes` desde ese
+   instante; si nadie lo reprograma antes de que venza, dispara el reload por su cuenta. Existe para
+   no dejar cartones (datos sensibles) visibles en una pantalla desatendida — sin este timer, la
+   pantalla queda expuesta indefinidamente hasta que alguien vuelve a tocarla. `setAuthUi(false)`
+   cancela el timer en un logout manual, para que no dispare un reload fantasma despues. Es
+   deliberadamente best-effort: los navegadores pueden pausar `setTimeout` en pestañas en segundo
+   plano, por eso las otras dos vias (sobre todo el ping de `visibilitychange`) siguen siendo el
+   respaldo que confirma contra el servidor.
 
 ## Auditoria
 
@@ -116,4 +145,7 @@ mismo click — no hay un paso intermedio de vista previa/confirmacion.
   paralelo.
 - Envolver el `catch` con `handleUnauthorized(error)` para que un 401 dispare el reload + toast
   igual que el resto.
+- Si la ruta nueva vive **fuera** de `/api/tickets`, pasar su respuesta por `withRefreshedSession`:
+  el deslizamiento de la sesion no es automatico por ruta, se aplica en `handleTickets` y en
+  `GET /api/auth/session`. Sin eso, usar esa accion no renueva la sesion.
 - Registrar la accion en `audit_logs` desde el Worker.

@@ -67,7 +67,8 @@ El login usa cookies `HttpOnly`, `Secure` y `SameSite=Strict`. Una credencial in
 5. Confirmar o ajustar variables no secretas en `wrangler.jsonc`:
 
    - `ADMIN_USERNAME` (por defecto `admin`)
-   - `SESSION_TTL_MINUTES` (por defecto `30`)
+   - `SESSION_TTL_MINUTES` (por defecto `30`): minutos de **inactividad** tolerados, no duracion fija
+     de la sesion. Cada request autenticada reinicia el contador (ver `docs/03-abm-seguridad.md`).
 
 6. Compilar y desplegar:
 
