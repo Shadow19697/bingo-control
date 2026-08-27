@@ -117,7 +117,7 @@ export function getAppTemplate(totalNumbers: number): string {
         </button>
         <button id="tab-tickets" class="tab-btn" type="button" aria-selected="false" hidden>
           Cartones
-          <span id="tab-tickets-alert-label" class="tab-alert-label" hidden>Nuevo</span>
+          <span id="tab-tickets-alert-label" class="tab-alert-label" hidden></span>
           <span id="tab-tickets-alert" class="tab-alert-dot" hidden aria-hidden="true"></span>
         </button>
         <button id="tab-management" class="tab-btn" type="button" aria-selected="false" hidden>

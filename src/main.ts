@@ -4,7 +4,7 @@ import { clearCalledNumbers, getTotalBingoNumbers, toggleCalledNumber } from "./
 import { BINGO_MAX, BINGO_MIN, isValidBingoNumber } from "./config";
 import { actionIcons, authIcons, themeIcons } from "./icons";
 import { parseBulkTicketsInput, parseTicketNumbersInput } from "./management";
-import { countTicketHits, parseTicketsPayload, sortTicketsById, type InvalidTicket, type Ticket } from "./tickets";
+import { countTicketHits, formatCompletedTicketsAlert, parseTicketsPayload, sortTicketsById, type InvalidTicket, type Ticket } from "./tickets";
 import { querySelectorOrThrow } from "./ui/dom";
 import { renderNumbersGrid, resetGridSelection, setNumberButtonState } from "./ui/grid";
 import { renderStatus, type StatusElements } from "./ui/status";
@@ -177,16 +177,31 @@ const getRankedTicketIndexes = (): number[] => {
 	return ranked.map((item) => item.index);
 };
 
-const updateTicketsTabAlert = (hasCompletedTickets: boolean): void => {
+const updateTicketsTabAlert = (completedIds: string[]): void => {
+	const hasCompletedTickets = completedIds.length > 0;
+	const { label, detail } = formatCompletedTicketsAlert(completedIds);
+
 	tabTickets.classList.toggle("has-alert", hasCompletedTickets);
 	tabTicketsAlert.hidden = !hasCompletedTickets;
 	tabTicketsAlertLabel.hidden = !hasCompletedTickets;
+	tabTicketsAlertLabel.textContent = label;
+
+	if (hasCompletedTickets) {
+		tabTickets.title = detail;
+		// El nombre accesible arranca con el texto visible de la pestaña (WCAG "label in name").
+		tabTickets.setAttribute("aria-label", `Cartones. ${detail}`);
+		return;
+	}
+
+	tabTickets.removeAttribute("title");
+	tabTickets.removeAttribute("aria-label");
 };
 
 const updateCompletedCount = (): void => {
-	const completedCount = ticketHits.filter((hits) => hits === 15).length;
-	completedCountLabel.textContent = String(completedCount);
-	updateTicketsTabAlert(completedCount > 0);
+	// tickets ya viene ordenado por ID (sortTicketsById), asi que el primer completo es el menor.
+	const completedIds = tickets.filter((_, index) => ticketHits[index] === 15).map((ticket) => ticket.id);
+	completedCountLabel.textContent = String(completedIds.length);
+	updateTicketsTabAlert(completedIds);
 };
 
 const resetTicketForm = (): void => {
@@ -832,8 +847,13 @@ const handleLogout = async (): Promise<void> => {
 	} finally {
 		setAuthUi(false);
 		tickets = [];
+		// Sin esto ticketHits queda con los aciertos de la sesion anterior y el aviso de la pestaña
+		// sigue nombrando un carton que ya no esta cargado.
+		ticketHits = [];
+		rebuildTicketIndexes();
 		clearManagementSearch();
 		ticketTableView = renderTicketsTable(ticketsBody, tickets);
+		updateCompletedCount();
 		renderManagementRows();
 		renderTicketLoadStatus([]);
 	}

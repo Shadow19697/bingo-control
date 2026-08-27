@@ -18,8 +18,16 @@ Llevar control de numeros cantados en una partida y cruzarlos contra cartones ca
   (`npm run db:local:seed`) y como referencia del formato.
 - Cada carton debe tener: `id` unico (entero positivo) + `numbers` con 15 enteros unicos entre 1 y 90.
 - `name` es opcional para identificar dueno o reserva del carton.
-- Un carton se considera completo cuando alcanza 15/15 aciertos.
+- Un carton se considera completo cuando alcanza 15/15 aciertos. Su fila en la matriz pasa a verde
+  entera, con barra lateral y chip `15/15` en el verde de acento (`--complete-accent`) — ver
+  `docs/05-tema-claro-oscuro.md` para por que hacen falta los overrides sobre las celdas cantadas.
 - El sistema muestra contador de cartones completos activos en la pestana Cartones.
+- La pestaña Cartones avisa con un punto pulsante y un chip que **nombra el carton completo**, no un
+  generico "Nuevo": `#1007` con uno solo, `#1007 +2` con varios (`formatCompletedTicketsAlert` en
+  `src/tickets.ts`). El primer ID es el menor, porque `tickets` ya viene ordenado por
+  `sortTicketsById` — asi el aviso es determinístico sin guardar estado de "quien completo ultimo".
+  El chip se recorta si no entra; el `title`/`aria-label` de la pestaña siempre lleva la lista
+  completa (hasta 8 IDs y despues `y N mas`).
 - El alta, edicion y borrado de cartones (ABM) vive en la pestaña Gestion, protegida por login —
   ver `docs/03-abm-seguridad.md` para las reglas de validacion y las convenciones de esa UI.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTicketsPayload, TICKET_NAME_MAX_LENGTH } from "./tickets";
+import { formatCompletedTicketsAlert, parseTicketsPayload, TICKET_NAME_MAX_LENGTH } from "./tickets";
 
 const numbers = [1, 4, 7, 12, 18, 23, 29, 34, 39, 45, 52, 60, 66, 73, 88];
 
@@ -51,5 +51,30 @@ describe("parseTicketsPayload", () => {
 		expect(parsed.invalidTickets).toHaveLength(2);
 		expect(parsed.invalidTickets.map((invalid) => invalid.field).sort()).toEqual(["id", "numbers"]);
 		expect(parsed.invalidTickets.every((invalid) => invalid.index === 0)).toBe(true);
+	});
+});
+
+describe("formatCompletedTicketsAlert", () => {
+	it("sin cartones completos no deja texto", () => {
+		expect(formatCompletedTicketsAlert([])).toEqual({ label: "", detail: "" });
+	});
+
+	it("con un solo ganador nombra el ID", () => {
+		expect(formatCompletedTicketsAlert(["1007"])).toEqual({ label: "#1007", detail: "Carton 1007 completo" });
+	});
+
+	it("con varios ganadores muestra el primero y cuantos faltan, y lista todos en el detalle", () => {
+		expect(formatCompletedTicketsAlert(["1007", "1012", "1030"])).toEqual({
+			label: "#1007 +2",
+			detail: "Cartones completos: 1007, 1012, 1030",
+		});
+	});
+
+	it("corta el detalle a 8 IDs y cierra con el resto", () => {
+		const ids = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+		expect(formatCompletedTicketsAlert(ids)).toEqual({
+			label: "#1 +9",
+			detail: "Cartones completos: 1, 2, 3, 4, 5, 6, 7, 8 y 2 mas",
+		});
 	});
 });

@@ -166,3 +166,28 @@ export function sortTicketsById(source: Ticket[]): Ticket[] {
 		a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" })
 	);
 }
+
+const COMPLETED_ALERT_DETAIL_LIMIT = 8;
+
+// El aviso de la pestaña Cartones nombra el carton completo en vez de un generico "Nuevo".
+// `label` va en el chip (poco espacio, se recorta por CSS) y `detail` en el title/aria-label.
+// Se espera `completedIds` ya ordenado por ID (sortTicketsById), asi que el primero es el menor:
+// determinístico sin guardar estado de "quien completo ultimo".
+export function formatCompletedTicketsAlert(completedIds: string[]): { label: string; detail: string } {
+	if (completedIds.length === 0) {
+		return { label: "", detail: "" };
+	}
+
+	const [first] = completedIds;
+	const others = completedIds.length - 1;
+
+	if (others === 0) {
+		return { label: `#${first}`, detail: `Carton ${first} completo` };
+	}
+
+	const shown = completedIds.slice(0, COMPLETED_ALERT_DETAIL_LIMIT).join(", ");
+	const hidden = completedIds.length - COMPLETED_ALERT_DETAIL_LIMIT;
+	const list = hidden > 0 ? `${shown} y ${hidden} mas` : shown;
+
+	return { label: `#${first} +${others}`, detail: `Cartones completos: ${list}` };
+}
